@@ -30,7 +30,7 @@
       "packagerConfig": {
         "appCopyright": "Copyright(C) 2020 Hidekazu Kubota",
         "asar": true,
-        "icon": "assets/rxdesktop_grad_icon",
+        "icon": "assets/rxdesktop_icon",
         "win32metadata": {
           "ProductName": "Reactive Desktop",
           "FileDescription": "Reactive Desktop"
