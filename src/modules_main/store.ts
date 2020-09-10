@@ -7,7 +7,7 @@
  */
 import path from 'path';
 import Store from 'electron-store';
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeImage } from 'electron';
 import { combineReducers, createStore } from 'redux';
 import { selectPreferredLanguage, translate } from 'typed-intl';
 import {
@@ -233,18 +233,16 @@ export const subscribeStoreFromSettings = (subscriber: BrowserWindow) => {
  * Initializing
  */
 // Temporal settings
-app
-  .getFileIcon(path.join(__dirname, '../assets/' + appIcon))
-  .then(img => {
-    const appName = app.getName();
-    const appVersion = app.getVersion();
-    const dataURL = img.toDataURL();
-    store.dispatch({
-      type: 'app-put',
-      payload: { name: appName, version: appVersion, iconDataURL: dataURL },
-    });
-  })
-  .catch(e => console.error(e));
+const appIconImage = nativeImage
+  .createFromPath(path.join(__dirname, '../assets/' + appIcon))
+  .resize({ width: 64, height: 64 });
+const dataURL = appIconImage.toDataURL();
+const appName = app.getName();
+const appVersion = app.getVersion();
+store.dispatch({
+  type: 'app-put',
+  payload: { name: appName, version: appVersion, iconDataURL: dataURL },
+});
 
 // Persistent settings are deserialized from electron-store
 export const initializeGlobalStore = (preferredLanguage: string) => {
