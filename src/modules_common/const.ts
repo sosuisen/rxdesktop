@@ -13,4 +13,4 @@ export const DialogButton = {
 };
 
 export const scheme = 'reactivedt';
-export const appIcon = 'rxdesktop_grad_icon.ico';
+export const appIcon = 'rxdesktop_icon.ico';
