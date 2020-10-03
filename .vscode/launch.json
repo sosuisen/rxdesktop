@@ -5,7 +5,7 @@
       "name": "Main",
       "type": "node",
       "request": "launch",
-      "preLaunchTask": "compile-main-debug-task",
+      // "preLaunchTask": "compile-main-debug-task",
       "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron-forge-vscode-nix",
       "windows": {
         "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron-forge-vscode-win.cmd"
@@ -21,7 +21,7 @@
     {
       "name": "Renderer",
       "type": "chrome",
-      "preLaunchTask": "Sleepdelay",
+      // "preLaunchTask": "Sleepdelay",
       "request": "attach",
       "port": 9222,
       "webRoot": "${workspaceRoot}/dist",
