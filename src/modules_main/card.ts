@@ -12,6 +12,7 @@ import contextMenu from 'electron-context-menu';
 
 import { v4 as uuidv4 } from 'uuid';
 import {
+  app,
   BrowserWindow,
   dialog,
   ipcMain,
@@ -509,21 +510,17 @@ export class Avatar {
     // Resized by hand
     // will-resize is only emitted when the window is being resized manually.
     // Resizing the window with setBounds/setSize will not emit this event.
-    this.window.on('will-resize', (event, newBounds) => {
-      this.window.webContents.send('resize-by-hand', newBounds);
-    });
+    this.window.on('will-resize', this._willResizeListener);
 
     // Moved by hand
-    this.window.on('will-move', (event, newBounds) => {
-      this.window.webContents.send('move-by-hand', newBounds);
-    });
+    this.window.on('will-move', this._willMoveListener);
 
-    this.window.on('closed', () => {
-      // Dereference the window object, usually you would store windows
-      // in an array if your app supports multi windows, this is the time
-      // when you should delete the corresponding element.
-      avatars.delete(this.prop.url);
-    });
+    this.window.on('closed', this._closedListener);
+
+    this.window.on('focus', this._focusListener);
+    this.window.on('blur', this._blurListener);
+
+    this.resetContextMenu = setContextMenu(this.prop, this.window);
 
     // Open hyperlink on external browser window
     // by preventing to open it on new electron window
@@ -532,11 +529,6 @@ export class Avatar {
       e.preventDefault();
       shell.openExternal(_url);
     });
-
-    this.window.on('focus', this._focusListener);
-    this.window.on('blur', this._blurListener);
-
-    this.resetContextMenu = setContextMenu(this.prop, this.window);
 
     this.window.webContents.on('did-finish-load', () => {
       const checkNavigation = (_event: Electron.Event, navUrl: string) => {
@@ -657,6 +649,72 @@ export class Avatar {
     });
   }
 
+  private _willMoveListener = (event: Electron.Event, newBounds: Electron.Rectangle) => {
+    this.window.webContents.send('move-by-hand', newBounds);
+  };
+
+  private _willResizeListener = (event: Electron.Event, newBounds: Electron.Rectangle) => {
+    this.window.webContents.send('resize-by-hand', newBounds);
+  };
+
+  private _closedListener = () => {
+    // Dereference the window object, usually you would store windows
+    // in an array if your app supports multi windows, this is the time
+    // when you should delete the corresponding element.
+    const avatar = avatars.get(this.prop.url);
+    if (avatar) {
+      avatar.removeWindowListeners();
+    }
+    avatars.delete(this.prop.url);
+    // Emit window-all-closed event explicitly
+    // because Electron sometimes does not emit it automatically.
+    if (avatars.size === 0) {
+      app.emit('window-all-closed');
+    }
+  };
+
+  // @ts-ignore
+  private _focusListener = e => {
+    if (this.recaptureGlobalFocusEventAfterLocalFocusEvent) {
+      this.recaptureGlobalFocusEventAfterLocalFocusEvent = false;
+      setGlobalFocusEventListenerPermission(true);
+    }
+    if (this.suppressFocusEventOnce) {
+      console.debug(`skip focus event listener ${this.prop.url}`);
+      this.suppressFocusEventOnce = false;
+    }
+    else if (!getGlobalFocusEventListenerPermission()) {
+      console.debug(`focus event listener is suppressed ${this.prop.url}`);
+    }
+    else {
+      console.debug(`focus ${this.prop.url}`);
+      this.window.webContents.send('card-focused');
+    }
+  };
+
+  private _blurListener = () => {
+    if (this.suppressBlurEventOnce) {
+      console.debug(`skip blur event listener ${this.prop.url}`);
+      this.suppressBlurEventOnce = false;
+    }
+    else {
+      console.debug(`blur ${this.prop.url}`);
+      this.window.webContents.send('card-blurred');
+    }
+  };
+
+  public removeWindowListeners = () => {
+    this.removeWindowListenersExceptClosedEvent();
+    this.window.off('closed', this._closedListener);
+  };
+
+  public removeWindowListenersExceptClosedEvent = () => {
+    this.window.off('will-resize', this._willResizeListener);
+    this.window.off('will-move', this._willMoveListener);
+    this.window.off('focus', this._focusListener);
+    this.window.off('blur', this._blurListener);
+  };
+
   public render = async () => {
     await this._loadHTML().catch(e => {
       throw new Error(`Error in render(): ${e.message}`);
@@ -713,35 +771,5 @@ export class Avatar {
 
       this.window.loadURL(this.indexUrl);
     });
-  };
-
-  // @ts-ignore
-  private _focusListener = e => {
-    if (this.recaptureGlobalFocusEventAfterLocalFocusEvent) {
-      this.recaptureGlobalFocusEventAfterLocalFocusEvent = false;
-      setGlobalFocusEventListenerPermission(true);
-    }
-    if (this.suppressFocusEventOnce) {
-      console.debug(`skip focus event listener ${this.prop.url}`);
-      this.suppressFocusEventOnce = false;
-    }
-    else if (!getGlobalFocusEventListenerPermission()) {
-      console.debug(`focus event listener is suppressed ${this.prop.url}`);
-    }
-    else {
-      console.debug(`focus ${this.prop.url}`);
-      this.window.webContents.send('card-focused');
-    }
-  };
-
-  private _blurListener = () => {
-    if (this.suppressBlurEventOnce) {
-      console.debug(`skip blur event listener ${this.prop.url}`);
-      this.suppressBlurEventOnce = false;
-    }
-    else {
-      console.debug(`blur ${this.prop.url}`);
-      this.window.webContents.send('card-blurred');
-    }
   };
 }

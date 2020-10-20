@@ -22,6 +22,7 @@ import {
 import { getRandomInt } from '../modules_common/utils';
 import { cardColors, ColorName, darkenHexColor } from '../modules_common/color';
 import {
+  addAvatarToWorkspace,
   getCurrentWorkspace,
   getCurrentWorkspaceId,
   getCurrentWorkspaceUrl,
@@ -116,7 +117,13 @@ export const setTrayContextMenu = () => {
             }
             else {
               setChangingToWorkspaceId(id);
-              avatars.forEach(avatar => avatar.window.webContents.send('card-close'));
+              try {
+                // Remove listeners firstly to avoid focus another card in closing process
+                avatars.forEach(avatar => avatar.removeWindowListenersExceptClosedEvent());
+                avatars.forEach(avatar => avatar.window.webContents.send('card-close'));
+              } catch (e) {
+                console.error(e);
+              }
               // wait 'window-all-closed' event
             }
           }
@@ -257,7 +264,11 @@ export const setTrayContextMenu = () => {
           emitter.emit('exit');
         }
         else {
-          avatars.forEach(avatar => avatar.window.webContents.send('card-close'));
+          try {
+            avatars.forEach(avatar => avatar.window.webContents.send('card-close'));
+          } catch (e) {
+            console.error(e);
+          }
         }
       },
     },
