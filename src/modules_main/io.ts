@@ -211,6 +211,7 @@ class CardIOClass implements ICardIO {
   };
 
   public updateWorkspaceStatus = async () => {
+    this.openWorkspaceDB();
     const currentId = await workspaceDB.get('currentId').catch(() => undefined);
     let currentIdRev = '';
     if (currentId) {
@@ -314,7 +315,6 @@ class CardIOClass implements ICardIO {
         .get(id)
         .then(doc => {
           const propsRequired: CardPropSerializable = new CardProp('').toObject();
-
           // Check versions and compatibility
           let isFirstVersion = false;
           if (!Object.prototype.hasOwnProperty.call(doc, 'version')) {
@@ -372,7 +372,7 @@ class CardIOClass implements ICardIO {
           const prop = new CardProp(id);
           prop.data = propsRequired.data;
           prop.avatars = propsRequired.avatars;
-
+          console.dir(prop.avatars);
           if (isFirstVersion) {
             this.updateOrCreateCardData(prop);
           }
