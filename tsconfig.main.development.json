@@ -21,6 +21,7 @@
     "src/modules_main/preload.ts"
   ],
   "exclude": [
-    "src/dialog_settings/*"
+    "src/dialog_settings/*",
+    "src/modules_renderer/*"
   ]
 }
