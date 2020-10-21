@@ -12,5 +12,5 @@ export const DialogButton = {
   Cancel: 1,
 };
 
-export const scheme = 'reactivedt';
+export const scheme = 'rxdesktop';
 export const appIcon = 'rxdesktop_icon.ico';

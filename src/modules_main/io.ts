@@ -1,4 +1,3 @@
-/* eslint-disable dot-notation */
 /**
  * @license Reactive Desktop
  * Copyright (c) Hidekazu Kubota
@@ -10,9 +9,16 @@
 /**
  * Common part
  */
-import PouchDB from 'pouchdb';
 import { nanoid } from 'nanoid';
 import fs from 'fs-extra';
+import {
+  addRxPlugin,
+  createRxDatabase,
+  RxCollectionCreator,
+  RxDatabase,
+  RxDocument,
+} from 'rxdb';
+import leveldown from 'leveldown';
 import {
   CardAvatars,
   CardCondition,
@@ -24,7 +30,7 @@ import {
   TransformableFeature,
 } from '../modules_common/cardprop';
 import { ICardIO } from '../modules_common/types';
-import { getSettings, MESSAGE } from './store';
+import { getSettings, MESSAGE } from './store_settings';
 import {
   getCurrentWorkspaceId,
   getCurrentWorkspaceUrl,
@@ -38,51 +44,105 @@ import {
   getWorkspaceIdFromUrl,
 } from '../modules_common/avatar_url_utils';
 import { getCurrentDateAndTime } from '../modules_common/utils';
+import { workspaceSchema } from '../modules_common/schema_workspace';
+import { cardSchema } from '../modules_common/schema_card';
 
 /**
  * Module specific part
  */
 
-var cardDB: PouchDB.Database<{}>;
-var workspaceDB: PouchDB.Database<{}>;
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+addRxPlugin(require('pouchdb-adapter-leveldb'));
+
+let syncType = 'coudbDB';
+syncType = 'GitHub';
+
+type CartaCollection = RxCollectionCreator & { sync: boolean };
 
 class CardIOClass implements ICardIO {
-  isCardDBClosed = true;
-  isWorkspaceDBClosed = true;
+  rxdb: RxDatabase;
+  syncURL = '';
 
-  openCardDB = () => {
-    if (cardDB === undefined || this.isCardDBClosed) {
-      cardDB = new PouchDB(getSettings().persistent.storage.path + '/card');
-      this.isCardDBClosed = false;
+  private _openDB = async () => {
+    if (this.rxdb) {
+      return;
     }
-  };
 
-  openWorkspaceDB = () => {
-    if (workspaceDB === undefined || this.isWorkspaceDBClosed) {
-      workspaceDB = new PouchDB(getSettings().persistent.storage.path + '/workspace');
-      this.isWorkspaceDBClosed = false;
+    const collections: CartaCollection[] = [
+      {
+        name: 'workspace',
+        schema: workspaceSchema,
+        sync: true,
+      },
+      {
+        name: 'card',
+        schema: cardSchema,
+        sync: true,
+      },
+    ];
+
+    this.rxdb = await createRxDatabase({
+      name: getSettings().persistent.storage.path + '/cartadb',
+      adapter: leveldown,
+    });
+
+    // Create all collections by one line
+    await Promise.all(collections.map(collection => this.rxdb.collection(collection)));
+
+    // hooks
+    this.rxdb.collections.workspace.$.subscribe(changeEvent => {
+      /*
+      // insert, update, delete
+      if (changeEvent.operation === 'INSERT') {
+        const payload = changeEvent.documentData;
+        mainWindow.webContents.send('persistent-store-updated', payload);
+      }
+      else if (changeEvent.operation === 'DELETE') {
+        mainWindow.webContents.send(
+          'persistent-store-deleted',
+          changeEvent.documentData.id
+        );
+      }
+    */
+    });
+
+    if (syncType === 'couchDB') {
+      // sync
+      console.log('DatabaseService: sync');
+      // Set sync() to all collections by one line
+      collections
+        .filter(col => col.sync)
+        .map(col => col.name)
+        .map(colName => {
+          const remoteURL = this.syncURL + colName + '/';
+          console.debug(remoteURL);
+          const state = this.rxdb[colName].sync({
+            remote: remoteURL,
+          });
+          state.change$.subscribe(change => console.dir(change, 3));
+          state.docs$.subscribe(docData => console.dir(docData, 3));
+          state.active$.subscribe(active =>
+            console.debug(`[${colName}] active: ${active}`)
+          );
+          state.alive$.subscribe(alive => console.debug(`[${colName}] alive: ${alive}`));
+          state.error$.subscribe(error => console.dir(error));
+        });
+    }
+    else if (syncType === 'GitHub') {
     }
   };
 
   public close = () => {
-    if (!this.isCardDBClosed) {
-      this.isCardDBClosed = true;
-      if (cardDB === undefined || cardDB === null) {
-        return Promise.resolve();
-      }
-      return cardDB.close();
+    if (!this.rxdb) {
+      return Promise.resolve();
     }
-    if (!this.isWorkspaceDBClosed) {
-      this.isWorkspaceDBClosed = true;
-      if (workspaceDB === undefined || workspaceDB === null) {
-        return Promise.resolve();
-      }
-      return workspaceDB.close();
-    }
+    return this.rxdb.destroy();
   };
 
   public loadOrCreateWorkspaces = async () => {
-    this.openWorkspaceDB();
+    await this._openDB();
+
+    /*
     (await workspaceDB.allDocs({ include_docs: true })).rows.forEach(row => {
       if (row.id === 'currentId') {
         const { currentId } = (row.doc as unknown) as { currentId: string };
@@ -96,8 +156,6 @@ class CardIOClass implements ICardIO {
     });
     if (workspaces.size === 0) {
       // Initialize or rebuild workspaces if workspaceDB folder does not exist.
-
-      this.openCardDB();
       const cardDocs = await cardDB.allDocs({ include_docs: true }).catch(() => undefined);
       if (cardDocs && cardDocs.rows.length > 0) {
         let lastWorkspaceId = '0';
@@ -154,16 +212,18 @@ class CardIOClass implements ICardIO {
       );
       this.updateWorkspaceStatus();
     }
+    */
   };
 
-  public createWorkspace = async (workspaceId: string, workspace: Workspace) => {
+  public createWorkspace = (workspaceId: string, workspace: Workspace) => {
     // Save new workspace
     const wsObj = {
       _id: workspaceId,
       _rev: '',
       ...workspace,
     };
-
+    return Promise.resolve();
+    /*
     await workspaceDB
       .put(wsObj)
       .then(res => {
@@ -173,10 +233,12 @@ class CardIOClass implements ICardIO {
       .catch(e => {
         throw new Error(`Error in createWorkspace()): ${e.message}`);
       });
+      */
   };
 
   public updateWorkspace = async (workspaceId: string, workspace: Workspace) => {
-    this.openWorkspaceDB();
+    await this._openDB();
+    /*
     const wsObj: { _id: string; _rev: string } & Workspace = {
       _id: workspaceId,
       _rev: '',
@@ -200,18 +262,22 @@ class CardIOClass implements ICardIO {
       .catch(e => {
         throw new Error(`Error in updateWorkspace: ${e.message}`);
       });
+    */
   };
 
   public deleteWorkspace = async (workspaceId: string) => {
-    this.openWorkspaceDB();
+    await this._openDB();
+    /*
     const workspace = await workspaceDB.get(workspaceId);
     await workspaceDB.remove(workspace).catch(e => {
       throw new Error(`Error in deleteWorkspace: ${e}`);
     });
+    */
   };
 
   public updateWorkspaceStatus = async () => {
-    this.openWorkspaceDB();
+    await this._openDB();
+    /*
     const currentId = await workspaceDB.get('currentId').catch(() => undefined);
     let currentIdRev = '';
     if (currentId) {
@@ -222,10 +288,12 @@ class CardIOClass implements ICardIO {
       _rev: currentIdRev,
       currentId: getCurrentWorkspaceId(),
     });
+  */
   };
 
   public addAvatarUrl = async (workspaceId: string, avatarUrl: string) => {
-    this.openWorkspaceDB();
+    await this._openDB();
+    /*
     const wsObj: { _id: string; _rev: string } & Workspace = {
       _id: workspaceId,
       _rev: '',
@@ -253,10 +321,12 @@ class CardIOClass implements ICardIO {
       .catch(e => {
         throw new Error(`Error in addAvatarUrl: ${e}`);
       });
+      */
   };
 
   public deleteAvatarUrl = async (workspaceId: string, avatarUrl: string) => {
-    this.openWorkspaceDB();
+    await this._openDB();
+    /*
     const wsObj: { _id: string; _rev: string } & Workspace = {
       _id: workspaceId,
       _rev: '',
@@ -278,11 +348,14 @@ class CardIOClass implements ICardIO {
     });
 
     console.debug(`Delete avatar: ${avatarUrl}`);
+  */
   };
 
-  public getCardIdList = (): Promise<string[]> => {
+  public getCardIdList = async (): Promise<string[]> => {
     // returns all card ids.
-    this.openCardDB();
+    await this._openDB();
+    return Promise.resolve([]);
+    /*
     return new Promise((resolve, reject) => {
       cardDB
         .allDocs()
@@ -293,23 +366,29 @@ class CardIOClass implements ICardIO {
           reject(err);
         });
     });
+    */
   };
 
   public deleteCardData = async (id: string): Promise<string> => {
     // for debug
     // await sleep(60000);
-    this.openCardDB();
+    await this._openDB();
+    return Promise.resolve('');
+    /*
     const card = await cardDB.get(id);
     await cardDB.remove(card).catch(e => {
       throw new Error(`Error in deleteCardData: ${e}`);
     });
     return id;
+    */
   };
 
-  public getCardData = (id: string): Promise<CardProp> => {
+  public getCardData = async (id: string): Promise<CardProp> => {
     // for debug
     // await sleep(60000);
-    this.openCardDB();
+    await this._openDB();
+    return Promise.resolve(new CardProp());
+    /*
     return new Promise((resolve, reject) => {
       cardDB
         .get(id)
@@ -383,10 +462,13 @@ class CardIOClass implements ICardIO {
           reject(e);
         });
     });
+  */
   };
 
   public updateOrCreateCardData = async (prop: CardProp): Promise<string> => {
-    this.openCardDB();
+    await this._openDB();
+    return Promise.resolve('');
+    /*
     console.debug('Saving card...: ' + JSON.stringify(prop.toObject()));
     // In PouchDB, _id must be used instead of id in document.
     // Convert class to Object to serialize.
@@ -403,7 +485,7 @@ class CardIOClass implements ICardIO {
         propObj._rev = oldCard._rev;
       })
       .catch(() => {
-        /* Create new card */
+        // Create new card
       });
 
     return cardDB
@@ -415,28 +497,28 @@ class CardIOClass implements ICardIO {
       .catch(e => {
         throw new Error(`Error in updateOrCreateCardDate: ${e.message}`);
       });
+      */
   };
 
   public export = async (filepath: string) => {
-    this.openWorkspaceDB();
-    this.openCardDB();
-
+    await this._openDB();
+    /*
     const cardIdMap: Record<string, string> = {};
     const cardObj = (await cardDB.allDocs({ include_docs: true })).rows.reduce(
       (obj, row) => {
         const newID = 'c' + nanoid();
         cardIdMap[row.id] = newID;
         obj[newID] = row.doc;
-        delete obj[newID]['_id'];
-        delete obj[newID]['_rev'];
+        delete obj[newID]._id;
+        delete obj[newID]._rev;
         return obj;
       },
       {} as { [id: string]: any }
     );
 
     const workspaceObj: Record<string, any> = {};
-    workspaceObj['version'] = 0;
-    workspaceObj['spaces'] = (await workspaceDB.allDocs({ include_docs: true })).rows
+    workspaceObj.version = 0;
+    workspaceObj.spaces = (await workspaceDB.allDocs({ include_docs: true })).rows
       .filter(row => row.id !== 'currentId')
       .map(row => {
         const doc = (row.doc as unknown) as Record<
@@ -444,16 +526,16 @@ class CardIOClass implements ICardIO {
           string | string[] | number | Record<string, string>
         >;
         const newID = 'w' + nanoid();
-        doc['id'] = newID;
-        delete doc['_id'];
-        delete doc['_rev'];
+        doc.id = newID;
+        delete doc._id;
+        delete doc._rev;
 
         const current = getCurrentDateAndTime();
-        doc['date'] = {
+        doc.date = {
           createdDate: current,
           modifiedDate: current,
         };
-        doc['version'] = 0;
+        doc.version = 0;
 
         if (row.doc) {
           const avatars = doc.avatars as string[];
@@ -466,10 +548,10 @@ class CardIOClass implements ICardIO {
 
               // @ts-ignore
               const newAvatar = cardObj[cardId].avatars[oldLocation];
-              newAvatar['id'] = newURL;
+              newAvatar.id = newURL;
               return newAvatar;
             });
-            doc['avatars'] = newAvatarArray;
+            doc.avatars = newAvatarArray;
           }
         }
         return doc;
@@ -491,24 +573,22 @@ class CardIOClass implements ICardIO {
     }
 
     const newCardObj: Record<string, any> = {};
-    newCardObj['version'] = 0;
+    newCardObj.version = 0;
 
     const cardArray = [];
     for (const id in cardObj) {
       cardObj[id].id = id;
       cardArray.push(cardObj[id]);
     }
-    newCardObj['cards'] = cardArray;
+    newCardObj.cards = cardArray;
 
     const dataObj = {
       workspace: workspaceObj,
       card: newCardObj,
     };
     fs.writeJSON(filepath, dataObj, { spaces: 2 });
+   */
   };
 }
 
-// Singleton.
-// Must export const CardIO.
-// CardIO is an instance of a class that implements ICardIO interface.
 export const CardIO = new CardIOClass();
