@@ -94,3 +94,5 @@ typings/
 # Electron-Forge
 out/
 config.json
+
+node_modules_before_using_rxdb
