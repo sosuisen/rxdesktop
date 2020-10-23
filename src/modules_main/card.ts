@@ -40,7 +40,7 @@ import {
 } from './store_workspaces';
 import { DialogButton } from '../modules_common/const';
 import { cardColors, ColorName } from '../modules_common/color';
-import { getSettings, globalDispatch, MESSAGE } from './store';
+import { getSettings, globalDispatch, MESSAGE } from './store_settings';
 import {
   getIdFromUrl,
   getLocationFromUrl,

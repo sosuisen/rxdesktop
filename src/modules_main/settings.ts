@@ -8,7 +8,7 @@
 import path from 'path';
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import electronConnect from 'electron-connect';
-import { subscribeStoreFromSettings } from './store';
+import { subscribeStoreFromSettings } from './store_settings';
 import { CardIO } from './io';
 
 // eslint-disable-next-line import/no-mutable-exports

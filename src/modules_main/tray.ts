@@ -9,7 +9,7 @@ import path from 'path';
 import prompt from 'electron-prompt';
 import { app, dialog, Menu, MenuItemConstructorOptions, Tray } from 'electron';
 import { closeSettings, openSettings, settingsDialog } from './settings';
-import { getSettings, MESSAGE } from './store';
+import { getSettings, MESSAGE } from './store_settings';
 import { avatars, createCard } from './card';
 import { emitter } from './event';
 import {

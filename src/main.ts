@@ -21,7 +21,7 @@ import {
   setGlobalFocusEventListenerPermission,
   updateAvatar,
 } from './modules_main/card';
-import { initializeGlobalStore, MESSAGE } from './modules_main/store';
+import { initializeGlobalStore, MESSAGE } from './modules_main/store_settings';
 import { destroyTray, initializeTaskTray, setTrayContextMenu } from './modules_main/tray';
 import { openSettings, settingsDialog } from './modules_main/settings';
 import { loadCurrentWorkspace } from './modules_main/workspace';

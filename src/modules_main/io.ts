@@ -60,6 +60,7 @@ syncType = 'GitHub';
 type CartaCollection = RxCollectionCreator & { sync: boolean };
 
 class CardIOClass implements ICardIO {
+  // @ts-ignore
   rxdb: RxDatabase;
   syncURL = '';
 
