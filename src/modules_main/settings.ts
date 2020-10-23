@@ -64,6 +64,10 @@ ipcMain.handle('open-directory-selector-dialog', (event, message: string) => {
   return openDirectorySelectorDialog(message);
 });
 
+ipcMain.handle('open-file-selector-dialog', (event, message: string) => {
+  return openFileSelectorDialog(message);
+});
+
 ipcMain.handle('close-cardio', async event => {
   await CardIO.close();
 });
@@ -75,6 +79,19 @@ ipcMain.handle('export-data-to', async (event, filepath: string) => {
 const openDirectorySelectorDialog = (message: string) => {
   const file: string[] | undefined = dialog.showOpenDialogSync(settingsDialog, {
     properties: ['openDirectory'],
+    title: message,
+    message: message, // macOS only
+  });
+  return file;
+};
+
+const openFileSelectorDialog = (message: string) => {
+  const file: string[] | undefined = dialog.showOpenDialogSync(settingsDialog, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'JSON', extensions: ['json'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
     title: message,
     message: message, // macOS only
   });

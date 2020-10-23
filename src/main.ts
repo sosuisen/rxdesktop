@@ -49,7 +49,7 @@ ipcMain.setMaxListeners(1000);
  * initialization and is ready to create browser windows.
  * Some APIs can only be used after this event occurs.
  */
-app.on('ready', async () => {
+app.on('ready', () => {
   // locale can be got after 'ready'
   const myLocale = app.getLocale();
   console.debug(`locale: ${myLocale}`);
@@ -65,9 +65,9 @@ app.on('ready', async () => {
   }
 
   // load workspaces
-  await CardIO.loadOrCreateWorkspaces().catch(e => console.error(e.message));
+  //  await CardIO.loadOrCreateWorkspaces().catch(e => console.error(e.message));
 
-  await loadCurrentWorkspace();
+  //  await loadCurrentWorkspace();
 
   /**
    * Add task tray

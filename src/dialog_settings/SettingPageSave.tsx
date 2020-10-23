@@ -95,6 +95,19 @@ export const SettingPageSave = (props: SettingPageSaveProps) => {
     }
   };
 
+  const onImportDataButtonClick = async () => {
+    const file = await ipcRenderer
+      .invoke('open-file-selector-dialog', MESSAGE('importDataButton'))
+      .catch(e => {
+        console.error(`Failed to open file selector dialog: ${e.me}`);
+      });
+    if (file) {
+      const filepath = file[0];
+      console.debug(filepath);
+      // await ipcRenderer.invoke('export-data-to', filepath);
+    }
+  };
+
   const buttonStyle = (color: ColorName) => ({
     backgroundColor: uiColors[color],
   });
@@ -123,6 +136,16 @@ export const SettingPageSave = (props: SettingPageSaveProps) => {
           style={buttonStyle('red')}
         >
           {MESSAGE('exportDataButton')}
+        </button>
+      </div>
+      <div styleName='importData'>
+        <div styleName='importDataLabel'>{MESSAGE('importData')}:</div>
+        <button
+          styleName='importDataButton'
+          onClick={onImportDataButtonClick}
+          style={buttonStyle('red')}
+        >
+          {MESSAGE('importDataButton')}
         </button>
       </div>
     </SettingPageTemplate>

@@ -137,6 +137,7 @@ export const setTrayContextMenu = () => {
   }
 
   const contextMenu = Menu.buildFromTemplate([
+    /*
     {
       label: MESSAGE('newCard'),
       click: () => {
@@ -246,6 +247,7 @@ export const setTrayContextMenu = () => {
     {
       type: 'separator',
     },
+    */
     {
       label: MESSAGE('settings'),
       click: () => {
@@ -286,9 +288,11 @@ export const initializeTaskTray = () => {
   tray = new Tray(path.join(__dirname, '../assets/' + appIcon));
   currentLanguage = getSettings().persistent.language;
   setTrayContextMenu();
+  /*
   tray.on('click', () => {
     createNewCard();
   });
+  */
 };
 
 emitter.on('updateTrayContextMenu', () => {
