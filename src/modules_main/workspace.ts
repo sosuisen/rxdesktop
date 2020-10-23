@@ -8,7 +8,7 @@
 
 import { getCurrentWorkspace, getCurrentWorkspaceId } from './store_workspaces';
 import { Avatar, avatars, Card, cards, getAvatarProp, getCardData } from './card';
-import { CardIO } from './io';
+import { CardIO } from './store';
 import { AvatarProp } from '../modules_common/cardprop';
 import { getIdFromUrl } from '../modules_common/avatar_url_utils';
 

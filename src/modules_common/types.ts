@@ -19,8 +19,8 @@ export type CardInitializeType = 'Load' | 'New';
 export interface ICardIO {
   close(): void;
   loadOrCreateWorkspaces(): Promise<void>;
-  createWorkspace(workspaceId: string, workspace: Workspace): Promise<void>;
-  updateWorkspace(workspaceId: string, workspace: Workspace): Promise<void>;
+  //  createWorkspace(workspaceId: string, workspace: Workspace): Promise<void>;
+  //  updateWorkspace(workspaceId: string, workspace: Workspace): Promise<void>;
   deleteWorkspace(workspaceId: string): Promise<void>;
   updateWorkspaceStatus(): Promise<void>;
 

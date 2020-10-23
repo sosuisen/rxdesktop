@@ -9,7 +9,7 @@ import path from 'path';
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import electronConnect from 'electron-connect';
 import { subscribeStoreFromSettings } from './store_settings';
-import { CardIO } from './io';
+import { CardIO } from './store';
 
 // eslint-disable-next-line import/no-mutable-exports
 export let settingsDialog: BrowserWindow;

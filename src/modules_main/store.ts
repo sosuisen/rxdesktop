@@ -37,8 +37,6 @@ import {
   getCurrentWorkspaceId,
   getCurrentWorkspaceUrl,
   setCurrentWorkspaceId,
-  Workspace,
-  workspaces,
 } from './store_workspaces';
 import {
   getIdFromUrl,
@@ -48,13 +46,40 @@ import {
 import { getCurrentDateAndTime } from '../modules_common/utils';
 import { workspaceSchema } from '../modules_common/schema_workspace';
 import { cardSchema } from '../modules_common/schema_card';
-
+import { appStateSchema } from '../modules_common/schema_appstate';
 /**
  * Module specific part
  */
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 addRxPlugin(require('pouchdb-adapter-leveldb'));
+
+type AppState = {
+  currentWorkspaceId: string;
+};
+
+type Workspace = {
+  id: string;
+  name: string;
+  date: {
+    createdDate: string;
+    modifiedDate: string;
+  };
+  version: number;
+  avatars: {
+    id: string;
+    data: string;
+    geometry: Geometry;
+    style: CardStyle;
+    condition: CardCondition;
+    date: CardDate;
+  };
+};
+
+const appState: AppState = {
+  currentWorkspaceId: '0',
+};
+let workspaces: Workspace[];
 
 let syncType = 'coudbDB';
 syncType = 'GitHub';
@@ -81,6 +106,11 @@ class CardIOClass implements ICardIO {
         name: 'card',
         schema: cardSchema,
         sync: true,
+      },
+      {
+        name: 'appstate',
+        schema: appStateSchema,
+        sync: false,
       },
     ];
 
@@ -145,77 +175,42 @@ class CardIOClass implements ICardIO {
   public loadOrCreateWorkspaces = async () => {
     await this._openDB();
 
-    /*
-    (await workspaceDB.allDocs({ include_docs: true })).rows.forEach(row => {
-      if (row.id === 'currentId') {
-        const { currentId } = (row.doc as unknown) as { currentId: string };
-        setCurrentWorkspaceId(currentId);
+    workspaces = ((await this.rxdb.collections.workspace.dump())
+      .docs as unknown) as Workspace[];
+
+    appState.currentWorkspaceId = await this.rxdb.collections.appstate
+      .findOne('currentWorkspaceId')
+      .exec();
+
+    /**
+     * TODO: currentWorkspaceId should be reactive.
+     * when appState is changed, currentWorkspace should be changed automatically.
+     */
+    if (appState.currentWorkspaceId === null) {
+      if (workspaces.length > 0) {
+        appState.currentWorkspaceId = workspaces[0].id;
+        setCurrentWorkspaceId(appState.currentWorkspaceId);
       }
-      else {
-        const { name, avatars } = (row.doc as unknown) as Workspace;
-        const workspace: Workspace = { name, avatars };
-        workspaces.set(row.id, workspace);
-      }
-    });
-    if (workspaces.size === 0) {
-      // Initialize or rebuild workspaces if workspaceDB folder does not exist.
-      const cardDocs = await cardDB.allDocs({ include_docs: true }).catch(() => undefined);
-      if (cardDocs && cardDocs.rows.length > 0) {
-        let lastWorkspaceId = '0';
-        // Rebuild workspaces
-        cardDocs.rows.forEach(row => {
-          const doc = row.doc;
-          if (!Object.prototype.hasOwnProperty.call(doc, 'version')) {
-            // Old version
-            const workspaceId = getCurrentWorkspaceId();
-            if (workspaces.has(workspaceId)) {
-              workspaces
-                .get(workspaceId)!
-                .avatars.push('reactivedt://local/avatar/0/' + doc!._id);
-            }
-            else {
-              workspaces.set(workspaceId, {
-                name: MESSAGE('workspaceName', `${parseInt(workspaceId, 10) + 1}`),
-                avatars: ['reactivedt://local/avatar/0/' + doc!._id],
-              });
-            }
-          }
-          else {
-            // Parse avatars and register it to its workspace.
-            const { avatars } = (doc as unknown) as { avatars: CardAvatars };
-            Object.keys(avatars).forEach(avatarLocation => {
-              const workspaceId = getWorkspaceIdFromUrl(avatarLocation);
-              if (parseInt(workspaceId, 10) > parseInt(lastWorkspaceId, 10)) {
-                lastWorkspaceId = workspaceId;
-              }
-              if (workspaces.has(workspaceId)) {
-                workspaces.get(workspaceId)!.avatars!.push(avatarLocation + doc!._id);
-              }
-              else {
-                workspaces.set(workspaceId, {
-                  name: MESSAGE('workspaceName', `${parseInt(workspaceId, 10) + 1}`),
-                  avatars: [avatarLocation + doc!._id],
-                });
-              }
-            });
-          }
-        });
-      }
-      else {
-        // Create initial workspace
-        const workspaceId = getCurrentWorkspaceId();
-        workspaces.set(workspaceId, {
-          name: MESSAGE('workspaceName', `${parseInt(workspaceId, 10) + 1}`),
-          avatars: [],
-        });
-      }
+    }
+    else {
+      setCurrentWorkspaceId(appState.currentWorkspaceId);
+    }
+
+    if (workspaces.length === 0) {
+      // Create initial workspace
+      /*
+      const workspaceId = getCurrentWorkspaceId();
+      workspaces.set(workspaceId, {
+        name: MESSAGE('workspaceName', `${parseInt(workspaceId, 10) + 1}`),
+        avatars: [],
+      });
 
       workspaces.forEach((workspace, workspaceId) =>
         this.createWorkspace(workspaceId, workspace)
       );
       this.updateWorkspaceStatus();
-    }
     */
+    }
   };
 
   public createWorkspace = (workspaceId: string, workspace: Workspace) => {

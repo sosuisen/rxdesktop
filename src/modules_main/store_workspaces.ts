@@ -15,6 +15,7 @@ export type Workspace = {
   name: string;
   avatars: string[];
 };
+
 export const workspaces = new Map<string, Workspace>();
 
 export const getWorkspaceUrl = (workspaceId: string) => {

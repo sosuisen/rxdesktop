@@ -31,7 +31,7 @@ import {
   Workspace,
   workspaces,
 } from './store_workspaces';
-import { CardIO } from './io';
+import { CardIO } from './store';
 import { appIcon } from '../modules_common/const';
 
 /**
