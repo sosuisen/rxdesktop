@@ -105,6 +105,7 @@ export const SettingPageSave = (props: SettingPageSaveProps) => {
       const filepath = file[0];
       console.debug(filepath);
       // await ipcRenderer.invoke('export-data-to', filepath);
+      await ipcRenderer.invoke('import-data-from', filepath);
     }
   };
 

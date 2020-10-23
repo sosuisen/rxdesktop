@@ -33,6 +33,7 @@ export interface ICardIO {
   deleteCardData(id: string): Promise<string>;
 
   export(filepath: string): Promise<void>;
+  import(filepath: string): Promise<void>;
 }
 
 export interface ICardEditor {

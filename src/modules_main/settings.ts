@@ -76,6 +76,10 @@ ipcMain.handle('export-data-to', async (event, filepath: string) => {
   await CardIO.export(filepath);
 });
 
+ipcMain.handle('import-data-from', async (event, filepath: string) => {
+  await CardIO.import(filepath);
+});
+
 const openDirectorySelectorDialog = (message: string) => {
   const file: string[] | undefined = dialog.showOpenDialogSync(settingsDialog, {
     properties: ['openDirectory'],

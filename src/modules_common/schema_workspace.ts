@@ -11,6 +11,20 @@ export const workspaceSchema = {
     name: {
       type: 'string',
     },
+    date: {
+      type: 'object',
+      properties: {
+        createdDate: {
+          type: 'string',
+        },
+        modifiedDate: {
+          type: 'string',
+        },
+      },
+    },
+    version: {
+      type: 'number',
+    },
     avatars: {
       type: 'array',
       items: {

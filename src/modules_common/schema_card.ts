@@ -28,5 +28,8 @@ export const cardSchema = {
         },
       },
     },
+    version: {
+      type: 'number',
+    },
   },
 };

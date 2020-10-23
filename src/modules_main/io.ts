@@ -1,3 +1,4 @@
+/* eslint-disable dot-notation */
 /**
  * @license Reactive Desktop
  * Copyright (c) Hidekazu Kubota
@@ -9,6 +10,7 @@
 /**
  * Common part
  */
+import { readFileSync } from 'fs';
 import { nanoid } from 'nanoid';
 import fs from 'fs-extra';
 import {
@@ -589,6 +591,19 @@ class CardIOClass implements ICardIO {
     };
     fs.writeJSON(filepath, dataObj, { spaces: 2 });
    */
+  };
+
+  public import = async (filepath: string) => {
+    await this._openDB();
+    const jsonObj = JSON.parse(readFileSync(filepath).toLocaleString());
+    try {
+      // @ts-ignore
+      this.rxdb.collections.workspace.bulkInsert(jsonObj['workspace']['spaces']);
+      // @ts-ignore
+      this.rxdb.collections.card.bulkInsert(jsonObj['card']['cards']);
+    } catch (e) {
+      console.debug(e);
+    }
   };
 }
 
