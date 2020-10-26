@@ -9,7 +9,7 @@ import path from 'path';
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import electronConnect from 'electron-connect';
 import { subscribeStoreFromSettings } from './store_settings';
-import { CardIO } from './store';
+import { closeDB, exportJSON, importJSON } from './store';
 
 // eslint-disable-next-line import/no-mutable-exports
 export let settingsDialog: BrowserWindow;
@@ -69,15 +69,15 @@ ipcMain.handle('open-file-selector-dialog', (event, message: string) => {
 });
 
 ipcMain.handle('close-cardio', async event => {
-  await CardIO.close();
+  await closeDB();
 });
 
 ipcMain.handle('export-data-to', async (event, filepath: string) => {
-  await CardIO.export(filepath);
+  await exportJSON(filepath);
 });
 
 ipcMain.handle('import-data-from', async (event, filepath: string) => {
-  await CardIO.import(filepath);
+  await importJSON(filepath);
 });
 
 const openDirectorySelectorDialog = (message: string) => {

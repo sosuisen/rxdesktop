@@ -129,7 +129,7 @@ const openDB = async () => {
   }
 };
 
-const close = () => {
+export const closeDB = () => {
   if (!rxdb) {
     return Promise.resolve();
   }
@@ -557,7 +557,7 @@ const updateOrCreateCardData = async (prop: CardProp): Promise<string> => {
     */
 };
 
-const exportJSON = async (filepath: string) => {
+export const exportJSON = async (filepath: string) => {
   await openDB().catch(err => {
     throw err;
   });
@@ -607,7 +607,7 @@ const exportJSON = async (filepath: string) => {
 
             // @ts-ignore
             const newAvatar = cardObj[cardId].avatars[oldLocation];
-            newAvatar.id = newURL;
+            newAvatar.url = newURL;
             return newAvatar;
           });
           doc.avatars = newAvatarArray;
@@ -649,7 +649,7 @@ const exportJSON = async (filepath: string) => {
  */
 };
 
-const importJSON = async (filepath: string) => {
+export const importJSON = async (filepath: string) => {
   await openDB().catch(err => {
     throw err;
   });
