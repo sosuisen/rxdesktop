@@ -466,7 +466,7 @@ class CardIOClass implements ICardIO {
 
               // @ts-ignore
               const newAvatar = cardObj[cardId].avatars[oldLocation];
-              newAvatar['id'] = newURL;
+              newAvatar['url'] = newURL;
               return newAvatar;
             });
             doc['avatars'] = newAvatarArray;
