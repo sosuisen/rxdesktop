@@ -1,3 +1,18 @@
+import { AvatarPropSerializable } from './cardprop';
+
+// For TypeScript
+export type Workspace = {
+  id: string;
+  name: string;
+  date: {
+    createdDate: string;
+    modifiedDate: string;
+  };
+  version: number;
+  avatars: AvatarPropSerializable[];
+};
+
+// For RxDB
 export const workspaceSchema = {
   title: 'workspace schema',
   description: 'RxSchema for workspaces of RxDesktop',
@@ -86,7 +101,7 @@ export const workspaceSchema = {
               },
             },
           },
-          id: {
+          url: {
             type: 'string',
           },
         },

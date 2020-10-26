@@ -16,26 +16,6 @@ import { Workspace } from '../modules_main/store_workspaces';
  */
 export type CardInitializeType = 'Load' | 'New';
 
-export interface ICardIO {
-  close(): void;
-  loadOrCreateWorkspaces(): Promise<void>;
-  //  createWorkspace(workspaceId: string, workspace: Workspace): Promise<void>;
-  //  updateWorkspace(workspaceId: string, workspace: Workspace): Promise<void>;
-  deleteWorkspace(workspaceId: string): Promise<void>;
-  updateWorkspaceStatus(): Promise<void>;
-
-  addAvatarUrl(workspaceId: string, avatarUrl: string): void;
-  deleteAvatarUrl(workspaceId: string, avatarUrl: string): void;
-
-  getCardIdList(): Promise<string[]>;
-  getCardData(id: string): Promise<CardProp>;
-  updateOrCreateCardData(prop: CardProp): Promise<string>;
-  deleteCardData(id: string): Promise<string>;
-
-  export(filepath: string): Promise<void>;
-  import(filepath: string): Promise<void>;
-}
-
 export interface ICardEditor {
   readonly hasCodeMode: boolean;
   isCodeMode: boolean;

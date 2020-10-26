@@ -4,7 +4,7 @@ export const appStateSchema = {
   version: 0,
   type: 'object',
   properties: {
-    name: {
+    key: {
       type: 'string',
       primary: true,
     },

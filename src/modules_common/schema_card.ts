@@ -1,3 +1,17 @@
+// For TypeScript
+export type Card = {
+  id: string;
+  type: string;
+  user: string;
+  data: string;
+  date: {
+    createdDate: string;
+    modifiedDate: string;
+  };
+  version: string;
+};
+
+// For RxDB
 export const cardSchema = {
   title: 'card schema',
   description: 'RxSchema for cards of RxDesktop',

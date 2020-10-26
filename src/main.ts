@@ -8,7 +8,6 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { app, BrowserWindow, dialog, ipcMain, MouseInputEvent } from 'electron';
-import { CardIO } from './modules_main/store';
 import { DialogButton } from './modules_common/const';
 import { AvatarPropSerializable, CardPropSerializable } from './modules_common/cardprop';
 import { availableLanguages, defaultLanguage, MessageLabel } from './modules_common/i18n';
@@ -24,7 +23,6 @@ import {
 import { initializeGlobalStore, MESSAGE } from './modules_main/store_settings';
 import { destroyTray, initializeTaskTray, setTrayContextMenu } from './modules_main/tray';
 import { openSettings, settingsDialog } from './modules_main/settings';
-import { loadCurrentWorkspace } from './modules_main/workspace';
 import {
   getChangingToWorkspaceId,
   setChangingToWorkspaceId,
@@ -32,6 +30,7 @@ import {
 } from './modules_main/store_workspaces';
 import { emitter, handlers } from './modules_main/event';
 import { getIdFromUrl } from './modules_common/avatar_url_utils';
+import { loadCurrentWorkspace } from './modules_main/store';
 
 // process.on('unhandledRejection', console.dir);
 
@@ -65,8 +64,6 @@ app.on('ready', async () => {
   }
 
   // load workspaces
-  await CardIO.loadOrCreateWorkspaces().catch(e => console.error(e.message));
-
   await loadCurrentWorkspace();
 
   /**
