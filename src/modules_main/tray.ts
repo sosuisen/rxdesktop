@@ -97,46 +97,52 @@ export const setTrayContextMenu = async () => {
   if (!tray) {
     return;
   }
-  const currentWorkspace = await getCurrentWorkspace();
-  const changeWorkspaces: MenuItemConstructorOptions[] = [...(await getWorkspaces())]
-    .sort(function (a, b) {
-      if (a.date.createdDate > b.date.createdDate) {
-        return 1;
-      }
-      else if (a.date.createdDate < b.date.createdDate) {
-        return -1;
-      }
-      return 0;
-    })
-    .map(workspace => {
-      return {
-        label: `${workspace.name}`,
-        type: 'radio',
-        checked: workspace.id === currentWorkspace.id,
-        click: () => {
-          if (workspace.id !== currentWorkspace.id) {
-            closeSettings();
-            if (currentWorkspace.avatars.length === 0) {
-              emitter.emit('change-workspace', workspace.id);
-            }
-            else {
-              setChangingToWorkspaceId(workspace.id);
-              try {
-                // Remove listeners firstly to avoid focus another card in closing process
-                /** 
+  const currentWorkspace = await getCurrentWorkspace().catch(err => {
+    console.error(err);
+    return null;
+  });
+  let changeWorkspaces: MenuItemConstructorOptions[] = [];
+  if (currentWorkspace !== null) {
+    changeWorkspaces = [...(await getWorkspaces())]
+      .sort(function (a, b) {
+        if (a.date.createdDate > b.date.createdDate) {
+          return 1;
+        }
+        else if (a.date.createdDate < b.date.createdDate) {
+          return -1;
+        }
+        return 0;
+      })
+      .map(workspace => {
+        return {
+          label: `${workspace.name}`,
+          type: 'radio',
+          checked: workspace.id === currentWorkspace.id,
+          click: () => {
+            if (workspace.id !== currentWorkspace.id) {
+              closeSettings();
+              if (currentWorkspace.avatars.length === 0) {
+                emitter.emit('change-workspace', workspace.id);
+              }
+              else {
+                setChangingToWorkspaceId(workspace.id);
+                try {
+                  // Remove listeners firstly to avoid focus another card in closing process
+                  /** 
                  * TODO: 
                 currentWorkspace.avatars.forEach(avatar => avatar.removeWindowListenersExceptClosedEvent());
                 currentWorkspace.avatars.forEach(avatar => avatar.window.webContents.send('card-close'));
                 */
-              } catch (e) {
-                console.error(e);
+                } catch (e) {
+                  console.error(e);
+                }
+                // wait 'window-all-closed' event
               }
-              // wait 'window-all-closed' event
             }
-          }
-        },
-      };
-    });
+          },
+        };
+      });
+  }
   if (changeWorkspaces.length > 0) {
     changeWorkspaces.unshift({
       type: 'separator',
@@ -264,6 +270,9 @@ export const setTrayContextMenu = async () => {
     {
       label: MESSAGE('exit'),
       click: () => {
+        if (!currentWorkspace) {
+          return;
+        }
         if (settingsDialog && !settingsDialog.isDestroyed()) {
           settingsDialog.close();
         }

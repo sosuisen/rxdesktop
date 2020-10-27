@@ -76,7 +76,7 @@ app.on('ready', async () => {
   // debug
   // await dumpDB();
 
-  await loadCurrentWorkspace();
+  await loadCurrentWorkspace().catch(err => console.error(err));
 
   prepareDbSync();
 
