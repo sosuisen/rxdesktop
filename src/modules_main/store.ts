@@ -45,6 +45,24 @@ type CartaCollection = RxCollectionCreator & { sync: boolean };
 let rxdb: RxDatabase;
 const syncURL = '';
 
+const collections: CartaCollection[] = [
+  {
+    name: 'workspace',
+    schema: workspaceSchema,
+    sync: true,
+  },
+  {
+    name: 'card',
+    schema: cardSchema,
+    sync: true,
+  },
+  {
+    name: 'appstate',
+    schema: appstateSchema,
+    sync: false,
+  },
+];
+
 /**
  * Dump RxDB for debug
  */
@@ -58,24 +76,6 @@ export const dumpDB = async () => {
 };
 
 export const openDB = async () => {
-  const collections: CartaCollection[] = [
-    {
-      name: 'workspace',
-      schema: workspaceSchema,
-      sync: true,
-    },
-    {
-      name: 'card',
-      schema: cardSchema,
-      sync: true,
-    },
-    {
-      name: 'appstate',
-      schema: appstateSchema,
-      sync: false,
-    },
-  ];
-
   rxdb = await createRxDatabase({
     name: getSettings().persistent.storage.path + '/cartadb',
     adapter: leveldown,
@@ -91,7 +91,16 @@ export const openDB = async () => {
       throw err;
     }
   );
+};
 
+export const closeDB = () => {
+  if (!rxdb) {
+    return Promise.resolve();
+  }
+  return rxdb.destroy();
+};
+
+export const prepareDbSync = () => {
   // hooks
   rxdb.collections.workspace.$.subscribe(changeEvent => {
     /*
@@ -133,13 +142,6 @@ export const openDB = async () => {
   }
 };
 
-export const closeDB = () => {
-  if (!rxdb) {
-    return Promise.resolve();
-  }
-  return rxdb.destroy();
-};
-
 const addNewAvatar = () => {
   /*
     const card = new Card('New');
@@ -168,13 +170,18 @@ export const loadCurrentWorkspace = async () => {
   const currentWorkspace = await getCurrentWorkspace().catch(err => {
     throw err;
   });
+  console.dir(currentWorkspace, { depth: null });
 
   const avatars: AvatarPropSerializable[] = currentWorkspace.avatars;
 
   const cardIds = avatars.map(avatar => getIdFromUrl(avatar.url));
   // Be unique
   const uniqueCardIds = [...new Set(cardIds)];
-  const cards = getCards(uniqueCardIds);
+  const cards = await getCards(uniqueCardIds).catch(err => {
+    throw err;
+  });
+
+  console.dir(cards, { depth: null });
 
   // TODO: Render avatars
   /*
@@ -280,6 +287,7 @@ const getCurrentWorkspace = async (): Promise<Workspace> => {
     console.error(err);
     return '';
   });
+  console.debug(`Current workspaceId: ${currentWorkspaceId}`);
   const workspace: RxDocument = ((await rxdb.collections.workspace
     .findOne(currentWorkspaceId)
     .exec()) as unknown) as RxDocument;
@@ -291,10 +299,11 @@ const getCurrentWorkspace = async (): Promise<Workspace> => {
 };
 
 const getCurrentWorkspaceId = async (): Promise<string> => {
-  let currentWorkspaceId = await rxdb.collections.appstate
+  let currentWorkspaceId;
+  const currentWorkspaceIdDoc = ((await rxdb.collections.appstate
     .findOne('currentWorkspaceId')
-    .exec();
-  if (currentWorkspaceId === null) {
+    .exec()) as unknown) as Appstate;
+  if (currentWorkspaceIdDoc === null) {
     const workspaces = await getWorkspaces();
     if (workspaces.length === 0) {
       throw new Error('No workspace exist.');
@@ -307,6 +316,9 @@ const getCurrentWorkspaceId = async (): Promise<string> => {
       version: APP_STATE_VERSION,
     });
   }
+
+  currentWorkspaceId = currentWorkspaceIdDoc.value;
+
   return currentWorkspaceId;
 };
 

@@ -35,6 +35,7 @@ import {
   dumpDB,
   loadCurrentWorkspace,
   openDB,
+  prepareDbSync,
   updateWorkspaceStatus,
 } from './modules_main/store';
 
@@ -73,9 +74,11 @@ app.on('ready', async () => {
   await openDB();
 
   // debug
-  await dumpDB();
+  // await dumpDB();
 
-  //  await loadCurrentWorkspace();
+  await loadCurrentWorkspace();
+
+  prepareDbSync();
 
   /**
    * Add task tray
