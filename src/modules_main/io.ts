@@ -436,6 +436,7 @@ class CardIOClass implements ICardIO {
 
     const workspaceObj: Record<string, any> = {};
     workspaceObj['version'] = 0;
+    let counter = 0;
     workspaceObj['spaces'] = (await workspaceDB.allDocs({ include_docs: true })).rows
       .filter(row => row.id !== 'currentId')
       .map(row => {
@@ -448,7 +449,10 @@ class CardIOClass implements ICardIO {
         delete doc['_id'];
         delete doc['_rev'];
 
-        const current = getCurrentDateAndTime();
+        const current = new Date(Date.now() + counter * 1000)
+          .toISOString()
+          .replace(/^(.+?)T(.+?)\..+?$/, '$1 $2');
+        counter++;
         doc['date'] = {
           createdDate: current,
           modifiedDate: current,
