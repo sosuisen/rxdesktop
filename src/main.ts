@@ -30,7 +30,13 @@ import {
 } from './modules_main/store_workspaces';
 import { emitter, handlers } from './modules_main/event';
 import { getIdFromUrl } from './modules_common/avatar_url_utils';
-import { loadCurrentWorkspace } from './modules_main/store';
+import {
+  closeDB,
+  dumpDB,
+  loadCurrentWorkspace,
+  openDB,
+  updateWorkspaceStatus,
+} from './modules_main/store';
 
 // process.on('unhandledRejection', console.dir);
 
@@ -64,7 +70,12 @@ app.on('ready', async () => {
   }
 
   // load workspaces
-  await loadCurrentWorkspace();
+  await openDB();
+
+  // debug
+  await dumpDB();
+
+  //  await loadCurrentWorkspace();
 
   /**
    * Add task tray
@@ -76,7 +87,7 @@ app.on('ready', async () => {
  * Exit app
  */
 emitter.on('exit', () => {
-  CardIO.close();
+  closeDB();
   destroyTray();
   app.quit();
 });
@@ -88,7 +99,7 @@ emitter.on('change-workspace', (nextWorkspaceId: string) => {
   cards.clear();
   setCurrentWorkspaceId(nextWorkspaceId);
   setTrayContextMenu();
-  CardIO.updateWorkspaceStatus();
+  updateWorkspaceStatus();
   loadCurrentWorkspace();
 });
 

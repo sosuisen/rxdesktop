@@ -13,7 +13,7 @@ export type Card = {
 
 // For RxDB
 export const cardSchema = {
-  title: 'card schema',
+  title: 'Card Schema',
   description: 'RxSchema for cards of RxDesktop',
   version: 0,
   type: 'object',

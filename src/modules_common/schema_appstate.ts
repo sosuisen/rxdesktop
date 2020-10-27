@@ -1,5 +1,13 @@
-export const appStateSchema = {
-  title: 'App State schema',
+// For TypeScript
+export type Appstate = {
+  key: string;
+  value: string;
+  version: string;
+};
+
+// For RxDB
+export const appstateSchema = {
+  title: 'App State Schema',
   description: 'RxSchema for app state of RxDesktop',
   version: 0,
   type: 'object',

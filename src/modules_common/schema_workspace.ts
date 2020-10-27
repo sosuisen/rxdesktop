@@ -14,7 +14,7 @@ export type Workspace = {
 
 // For RxDB
 export const workspaceSchema = {
-  title: 'workspace schema',
+  title: 'Workspace Schema',
   description: 'RxSchema for workspaces of RxDesktop',
   version: 0,
   type: 'object',

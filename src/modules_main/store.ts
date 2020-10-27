@@ -26,7 +26,7 @@ import { getIdFromUrl } from '../modules_common/avatar_url_utils';
 import { getCurrentDateAndTime } from '../modules_common/utils';
 import { Workspace, workspaceSchema } from '../modules_common/schema_workspace';
 import { Card, cardSchema } from '../modules_common/schema_card';
-import { appStateSchema } from '../modules_common/schema_appstate';
+import { Appstate, appstateSchema } from '../modules_common/schema_appstate';
 /**
  * Module specific part
  */
@@ -44,14 +44,20 @@ type CartaCollection = RxCollectionCreator & { sync: boolean };
 
 let rxdb: RxDatabase;
 const syncURL = '';
-let dbIsOpened = false;
 
-const openDB = async () => {
-  if (dbIsOpened) {
-    return;
-  }
-  dbIsOpened = true;
+/**
+ * Dump RxDB for debug
+ */
+export const dumpDB = async () => {
+  console.debug('************* Appstates');
+  console.dir(await getAppstates(), { depth: null });
+  console.debug('************* Workspaces');
+  console.dir(await getWorkspaces(), { depth: null });
+  console.debug('************* Cards');
+  console.dir(await getCards(), { depth: null });
+};
 
+export const openDB = async () => {
   const collections: CartaCollection[] = [
     {
       name: 'workspace',
@@ -65,7 +71,7 @@ const openDB = async () => {
     },
     {
       name: 'appstate',
-      schema: appStateSchema,
+      schema: appstateSchema,
       sync: false,
     },
   ];
@@ -75,7 +81,6 @@ const openDB = async () => {
     adapter: leveldown,
   }).catch(err => {
     console.error(err);
-    dbIsOpened = false;
     throw err;
   });
 
@@ -83,7 +88,6 @@ const openDB = async () => {
   await Promise.all(collections.map(collection => rxdb.collection(collection))).catch(
     err => {
       console.error(err);
-      dbIsOpened = false;
       throw err;
     }
   );
@@ -228,7 +232,27 @@ const createWorkspace = async (name?: string): Promise<Workspace> => {
   return newDoc.toJSON() as Workspace;
 };
 
-const getCards = async (cardIds: string[]): Promise<Card[]> => {
+const getAppstates = async (stateKeys?: string[]): Promise<Appstate[]> => {
+  if (stateKeys === undefined) {
+    // All cards
+    return ((await rxdb.collections.appstate.dump()).docs as unknown) as Appstate[];
+  }
+
+  // Selected cards
+  const appstateDocsMap = (await rxdb.collections.appstate.findByIds(stateKeys)) as Map<
+    string,
+    RxDocument
+  >;
+  return [...appstateDocsMap.values()].map(appstateDoc => appstateDoc.toJSON() as Appstate);
+};
+
+const getCards = async (cardIds?: string[]): Promise<Card[]> => {
+  if (cardIds === undefined) {
+    // All cards
+    return ((await rxdb.collections.card.dump()).docs as unknown) as Card[];
+  }
+
+  // Selected cards
   const cardDocsMap = (await rxdb.collections.card.findByIds(cardIds)) as Map<
     string,
     RxDocument
@@ -236,8 +260,19 @@ const getCards = async (cardIds: string[]): Promise<Card[]> => {
   return [...cardDocsMap.values()].map(cardDoc => cardDoc.toJSON() as Card);
 };
 
-const getWorkspaces = async (): Promise<Workspace[]> => {
-  return ((await rxdb.collections.workspace.dump()).docs as unknown) as Workspace[];
+const getWorkspaces = async (workspaceIds?: string[]): Promise<Workspace[]> => {
+  if (workspaceIds === undefined) {
+    // All workspaces
+    return ((await rxdb.collections.workspace.dump()).docs as unknown) as Workspace[];
+  }
+
+  // Selected workspaces
+  const workspaceDocsMap = (await rxdb.collections.workspace.findByIds(
+    workspaceIds
+  )) as Map<string, RxDocument>;
+  return [...workspaceDocsMap.values()].map(
+    workspaceDoc => workspaceDoc.toJSON() as Workspace
+  );
 };
 
 const getCurrentWorkspace = async (): Promise<Workspace> => {
@@ -275,10 +310,7 @@ const getCurrentWorkspaceId = async (): Promise<string> => {
   return currentWorkspaceId;
 };
 
-const updateWorkspace = async (workspaceId: string, workspace: Workspace) => {
-  await openDB().catch(err => {
-    throw err;
-  });
+export const updateWorkspace = async (workspaceId: string, workspace: Workspace) => {
   /*
   const wsObj: { _id: string; _rev: string } & Workspace = {
     _id: workspaceId,
@@ -306,10 +338,7 @@ const updateWorkspace = async (workspaceId: string, workspace: Workspace) => {
   */
 };
 
-const deleteWorkspace = async (workspaceId: string) => {
-  await openDB().catch(err => {
-    throw err;
-  });
+export const deleteWorkspace = async (workspaceId: string) => {
   /*
   const workspace = await workspaceDB.get(workspaceId);
   await workspaceDB.remove(workspace).catch(e => {
@@ -318,10 +347,7 @@ const deleteWorkspace = async (workspaceId: string) => {
   */
 };
 
-const updateWorkspaceStatus = async () => {
-  await openDB().catch(err => {
-    throw err;
-  });
+export const updateWorkspaceStatus = async () => {
   /*
   const currentId = await workspaceDB.get('currentId').catch(() => undefined);
   let currentIdRev = '';
@@ -336,10 +362,7 @@ const updateWorkspaceStatus = async () => {
 */
 };
 
-const addAvatarUrl = async (workspaceId: string, avatarUrl: string) => {
-  await openDB().catch(err => {
-    throw err;
-  });
+export const addAvatarUrl = async (workspaceId: string, avatarUrl: string) => {
   /*
   const wsObj: { _id: string; _rev: string } & Workspace = {
     _id: workspaceId,
@@ -371,10 +394,7 @@ const addAvatarUrl = async (workspaceId: string, avatarUrl: string) => {
     */
 };
 
-const deleteAvatarUrl = async (workspaceId: string, avatarUrl: string) => {
-  await openDB().catch(err => {
-    throw err;
-  });
+export const deleteAvatarUrl = async (workspaceId: string, avatarUrl: string) => {
   /*
   const wsObj: { _id: string; _rev: string } & Workspace = {
     _id: workspaceId,
@@ -400,11 +420,9 @@ const deleteAvatarUrl = async (workspaceId: string, avatarUrl: string) => {
 */
 };
 
-const getCardIdList = async (): Promise<string[]> => {
+const getCardIdList = (): Promise<string[]> => {
   // returns all card ids.
-  await openDB().catch(err => {
-    throw err;
-  });
+
   return Promise.resolve([]);
   /*
   return new Promise((resolve, reject) => {
@@ -420,12 +438,10 @@ const getCardIdList = async (): Promise<string[]> => {
   */
 };
 
-const deleteCardData = async (id: string): Promise<string> => {
+export const deleteCardData = (id: string): Promise<string> => {
   // for debug
   // await sleep(60000);
-  await openDB().catch(err => {
-    throw err;
-  });
+
   return Promise.resolve('');
   /*
   const card = await cardDB.get(id);
@@ -436,12 +452,10 @@ const deleteCardData = async (id: string): Promise<string> => {
   */
 };
 
-const getCardData = async (id: string): Promise<CardProp> => {
+export const getCardProp = (id: string): Promise<CardProp> => {
   // for debug
   // await sleep(60000);
-  await openDB().catch(err => {
-    throw err;
-  });
+
   return Promise.resolve(new CardProp());
   /*
   return new Promise((resolve, reject) => {
@@ -520,10 +534,7 @@ const getCardData = async (id: string): Promise<CardProp> => {
 */
 };
 
-const updateOrCreateCardData = async (prop: CardProp): Promise<string> => {
-  await openDB().catch(err => {
-    throw err;
-  });
+export const updateOrCreateCardData = (prop: CardProp): Promise<string> => {
   return Promise.resolve('');
   /*
   console.debug('Saving card...: ' + JSON.stringify(prop.toObject()));
@@ -557,10 +568,7 @@ const updateOrCreateCardData = async (prop: CardProp): Promise<string> => {
     */
 };
 
-export const exportJSON = async (filepath: string) => {
-  await openDB().catch(err => {
-    throw err;
-  });
+export const exportJSON = (filepath: string) => {
   /*
   const cardIdMap: Record<string, string> = {};
   const cardObj = (await cardDB.allDocs({ include_docs: true })).rows.reduce(
@@ -650,16 +658,15 @@ export const exportJSON = async (filepath: string) => {
 };
 
 export const importJSON = async (filepath: string) => {
-  await openDB().catch(err => {
-    throw err;
-  });
+  console.debug('Start import JSON from ' + filepath);
   const jsonObj = JSON.parse(readFileSync(filepath).toLocaleString());
   try {
     // @ts-ignore
-    rxdb.collections.workspace.bulkInsert(jsonObj['workspace']['spaces']);
+    await rxdb.collections.workspace.bulkInsert(jsonObj['workspace']['spaces']);
     // @ts-ignore
-    rxdb.collections.card.bulkInsert(jsonObj['card']['cards']);
+    await rxdb.collections.card.bulkInsert(jsonObj['card']['cards']);
   } catch (e) {
     console.debug(e);
   }
+  console.debug('Finished');
 };
