@@ -10,7 +10,7 @@ import prompt from 'electron-prompt';
 import { app, dialog, Menu, MenuItemConstructorOptions, Tray } from 'electron';
 import { closeSettings, openSettings, settingsDialog } from './settings';
 import { getSettings, MESSAGE } from './store_settings';
-import { avatars, createCard } from './card';
+import { createCard } from './card';
 import { emitter } from './event';
 import {
   CardAvatars,
@@ -23,15 +23,11 @@ import { getRandomInt } from '../modules_common/utils';
 import { cardColors, ColorName, darkenHexColor } from '../modules_common/color';
 import {
   addAvatarToWorkspace,
-  getCurrentWorkspace,
-  getCurrentWorkspaceId,
-  getCurrentWorkspaceUrl,
   getNextWorkspaceId,
   setChangingToWorkspaceId,
-  Workspace,
-  workspaces,
 } from './store_workspaces';
 import { appIcon } from '../modules_common/const';
+import { getCurrentWorkspace, getWorkspaces } from './store';
 
 /**
  * Task tray
@@ -49,7 +45,7 @@ let currentLanguage: string;
 let color = { ...cardColors };
 delete color.transparent;
 
-const createNewCard = async () => {
+const createNewCard = () => {
   const geometry = { ...DEFAULT_CARD_GEOMETRY };
   geometry.x += getRandomInt(30, 100);
   geometry.y += getRandomInt(30, 100);
@@ -66,6 +62,9 @@ const createNewCard = async () => {
   const bgColor: string = cardColors[newColor];
 
   const newAvatars: CardAvatars = {};
+  /** 
+   * TODO: 
+  
   newAvatars[getCurrentWorkspaceUrl()] = new TransformableFeature(
     {
       x: geometry.x,
@@ -87,39 +86,48 @@ const createNewCard = async () => {
       avatars: newAvatars,
     } as unknown) as CardPropSerializable)
   );
-  const newAvatar = avatars.get(getCurrentWorkspaceUrl() + id);
+   const newAvatar = avatars.get(getCurrentWorkspaceUrl() + id);
   if (newAvatar) {
     newAvatar.window.focus();
   }
+ */
 };
 
-export const setTrayContextMenu = () => {
+export const setTrayContextMenu = async () => {
   if (!tray) {
     return;
   }
-  const changeWorkspaces: MenuItemConstructorOptions[] = [...workspaces.keys()]
-    .sort()
-    .map(id => {
+  const currentWorkspace = await getCurrentWorkspace();
+  const changeWorkspaces: MenuItemConstructorOptions[] = [...(await getWorkspaces())]
+    .sort(function (a, b) {
+      if (a.date.createdDate > b.date.createdDate) {
+        return 1;
+      }
+      else if (a.date.createdDate < b.date.createdDate) {
+        return -1;
+      }
+      return 0;
+    })
+    .map(workspace => {
       return {
-        label: `${workspaces.get(id)?.name}`,
+        label: `${workspace.name}`,
         type: 'radio',
-        checked: id === getCurrentWorkspaceId(),
+        checked: workspace.id === currentWorkspace.id,
         click: () => {
-          if (id !== getCurrentWorkspaceId()) {
-            const workspace = workspaces.get(id);
-            if (!workspace) {
-              return;
-            }
+          if (workspace.id !== currentWorkspace.id) {
             closeSettings();
-            if (avatars.size === 0) {
-              emitter.emit('change-workspace', id);
+            if (currentWorkspace.avatars.length === 0) {
+              emitter.emit('change-workspace', workspace.id);
             }
             else {
-              setChangingToWorkspaceId(id);
+              setChangingToWorkspaceId(workspace.id);
               try {
                 // Remove listeners firstly to avoid focus another card in closing process
-                avatars.forEach(avatar => avatar.removeWindowListenersExceptClosedEvent());
-                avatars.forEach(avatar => avatar.window.webContents.send('card-close'));
+                /** 
+                 * TODO: 
+                currentWorkspace.avatars.forEach(avatar => avatar.removeWindowListenersExceptClosedEvent());
+                currentWorkspace.avatars.forEach(avatar => avatar.window.webContents.send('card-close'));
+                */
               } catch (e) {
                 console.error(e);
               }
@@ -242,11 +250,11 @@ export const setTrayContextMenu = () => {
         emitter.emit('change-workspace', '0');
       },
     },
+  */
     ...changeWorkspaces,
     {
       type: 'separator',
     },
-    */
     {
       label: MESSAGE('settings'),
       click: () => {
@@ -261,12 +269,16 @@ export const setTrayContextMenu = () => {
         }
         setChangingToWorkspaceId('exit');
         closeSettings();
-        if (avatars.size === 0) {
+        if (currentWorkspace.avatars.length === 0) {
           emitter.emit('exit');
         }
         else {
           try {
+            /** 
+             * TODO:
+             
             avatars.forEach(avatar => avatar.window.webContents.send('card-close'));
+            */
           } catch (e) {
             console.error(e);
           }

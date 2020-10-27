@@ -267,7 +267,7 @@ const getCards = async (cardIds?: string[]): Promise<Card[]> => {
   return [...cardDocsMap.values()].map(cardDoc => cardDoc.toJSON() as Card);
 };
 
-const getWorkspaces = async (workspaceIds?: string[]): Promise<Workspace[]> => {
+export const getWorkspaces = async (workspaceIds?: string[]): Promise<Workspace[]> => {
   if (workspaceIds === undefined) {
     // All workspaces
     return ((await rxdb.collections.workspace.dump()).docs as unknown) as Workspace[];
@@ -282,7 +282,7 @@ const getWorkspaces = async (workspaceIds?: string[]): Promise<Workspace[]> => {
   );
 };
 
-const getCurrentWorkspace = async (): Promise<Workspace> => {
+export const getCurrentWorkspace = async (): Promise<Workspace> => {
   const currentWorkspaceId = await getCurrentWorkspaceId().catch(err => {
     console.error(err);
     return '';
