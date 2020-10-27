@@ -254,32 +254,55 @@ const getAppstates = async (stateKeys?: string[]): Promise<Appstate[]> => {
 };
 
 const getCards = async (cardIds?: string[]): Promise<Card[]> => {
+  let cards: Card[];
   if (cardIds === undefined) {
     // All cards
-    return ((await rxdb.collections.card.dump()).docs as unknown) as Card[];
+    cards = ((await rxdb.collections.card.dump()).docs as unknown) as Card[];
   }
-
-  // Selected cards
-  const cardDocsMap = (await rxdb.collections.card.findByIds(cardIds)) as Map<
-    string,
-    RxDocument
-  >;
-  return [...cardDocsMap.values()].map(cardDoc => cardDoc.toJSON() as Card);
+  else {
+    // Selected cards
+    const cardDocsMap = (await rxdb.collections.card.findByIds(cardIds)) as Map<
+      string,
+      RxDocument
+    >;
+    cards = [...cardDocsMap.values()].map(cardDoc => cardDoc.toJSON() as Card);
+  }
+  return cards.sort(function (a, b) {
+    if (a.date.createdDate > b.date.createdDate) {
+      return 1;
+    }
+    else if (a.date.createdDate < b.date.createdDate) {
+      return -1;
+    }
+    return 0;
+  });
 };
 
 export const getWorkspaces = async (workspaceIds?: string[]): Promise<Workspace[]> => {
+  let workspaces: Workspace[];
   if (workspaceIds === undefined) {
     // All workspaces
-    return ((await rxdb.collections.workspace.dump()).docs as unknown) as Workspace[];
+    workspaces = ((await rxdb.collections.workspace.dump()).docs as unknown) as Workspace[];
+  }
+  else {
+    // Selected workspaces
+    const workspaceDocsMap = (await rxdb.collections.workspace.findByIds(
+      workspaceIds
+    )) as Map<string, RxDocument>;
+    workspaces = [...workspaceDocsMap.values()].map(
+      workspaceDoc => workspaceDoc.toJSON() as Workspace
+    );
   }
 
-  // Selected workspaces
-  const workspaceDocsMap = (await rxdb.collections.workspace.findByIds(
-    workspaceIds
-  )) as Map<string, RxDocument>;
-  return [...workspaceDocsMap.values()].map(
-    workspaceDoc => workspaceDoc.toJSON() as Workspace
-  );
+  return workspaces.sort(function (a, b) {
+    if (a.date.createdDate > b.date.createdDate) {
+      return 1;
+    }
+    else if (a.date.createdDate < b.date.createdDate) {
+      return -1;
+    }
+    return 0;
+  });
 };
 
 export const getCurrentWorkspace = async (): Promise<Workspace> => {
