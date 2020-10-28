@@ -21,7 +21,7 @@ import {
   FileDropEvent,
   ICardEditor,
   InnerClickEvent,
-} from './modules_common/types';
+} from './modules_common/types_cardeditor';
 import { DialogButton } from './modules_common/const';
 import { CardEditor } from './modules_renderer/editor';
 import {

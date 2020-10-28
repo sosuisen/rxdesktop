@@ -7,7 +7,7 @@
  */
 
 import { AvatarProp, DRAG_IMAGE_MARGIN } from '../modules_common/cardprop';
-import { CardCssStyle, ICardEditor } from '../modules_common/types';
+import { CardCssStyle, ICardEditor } from '../modules_common/types_cardeditor';
 import {
   getRenderOffsetHeight,
   getRenderOffsetWidth,

@@ -1,5 +1,3 @@
-import { AvatarPropSerializable } from './cardprop';
-
 // For TypeScript
 export type Workspace = {
   id: string;
@@ -9,7 +7,7 @@ export type Workspace = {
     modifiedDate: string;
   };
   version: number;
-  avatars: AvatarPropSerializable[];
+  avatars: string[];
 };
 
 // For RxDB
@@ -42,69 +40,9 @@ export const workspaceSchema = {
     },
     avatars: {
       type: 'array',
+      ref: 'avatar', // refers to collection 'avatar'
       items: {
-        type: 'object',
-        properties: {
-          geometry: {
-            type: 'object',
-            properties: {
-              x: {
-                type: 'number',
-              },
-              y: {
-                type: 'number',
-              },
-              z: {
-                type: 'number',
-              },
-              width: {
-                type: 'number',
-              },
-              height: {
-                type: 'number',
-              },
-            },
-          },
-          style: {
-            type: 'object',
-            properties: {
-              uiColor: {
-                type: 'string',
-              },
-              backgroundColor: {
-                type: 'string',
-              },
-              opacity: {
-                type: 'number',
-              },
-              zoom: {
-                type: 'number',
-              },
-            },
-          },
-          condition: {
-            type: 'object',
-            properties: {
-              locked: {
-                type: 'boolean',
-              },
-            },
-          },
-          date: {
-            type: 'object',
-            properties: {
-              createdDate: {
-                type: 'string',
-              },
-              modifiedDate: {
-                type: 'string',
-              },
-            },
-          },
-          url: {
-            type: 'string',
-          },
-        },
+        type: 'string',
       },
     },
   },

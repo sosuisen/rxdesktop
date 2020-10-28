@@ -9,7 +9,7 @@
 /**
  * ATTENTION: Only types can be import for type checking in iframe.
  */
-import { ContentsFrameMessage } from '../modules_common/types';
+import { ContentsFrameMessage } from '../modules_common/types_cardeditor';
 
 window.addEventListener('message', (event: MessageEvent) => {
   const msg: ContentsFrameMessage = event.data;

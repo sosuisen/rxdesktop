@@ -7,7 +7,7 @@
  */
 
 import { AvatarProp, CardProp } from '../modules_common/cardprop';
-import { CardCssStyle, ICardEditor } from '../modules_common/types';
+import { CardCssStyle, ICardEditor } from '../modules_common/types_cardeditor';
 import { convertHexColorToRgba, darkenHexColor } from '../modules_common/color';
 import window from './window';
 import { getCtrlDown } from '../modules_common/keys';

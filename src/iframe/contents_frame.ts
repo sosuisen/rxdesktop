@@ -13,7 +13,7 @@ import {
   ContentsFrameMessage,
   FileDropEvent,
   InnerClickEvent,
-} from '../modules_common/types';
+} from '../modules_common/types_cardeditor';
 
 // window.addEventListener('click', event => {
 window.addEventListener('mouseup', event => {

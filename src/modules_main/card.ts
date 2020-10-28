@@ -27,7 +27,7 @@ import {
   TransformableFeature,
 } from '../modules_common/cardprop';
 import { sleep } from '../modules_common/utils';
-import { CardInitializeType } from '../modules_common/types';
+import { CardInitializeType } from '../modules_common/types_cardeditor';
 import {
   addAvatarToWorkspace,
   getCurrentWorkspace,

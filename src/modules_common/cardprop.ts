@@ -9,6 +9,7 @@
 import { getCurrentDateAndTime } from './utils';
 import { cardColors, darkenHexColor } from './color';
 import { getCurrentWorkspaceUrl } from '../modules_main/store_workspaces';
+import { CartaDate } from './types';
 
 export const cardVersion = '1.0';
 
@@ -45,10 +46,6 @@ export type CardStyle = {
 export type CardCondition = {
   locked: boolean;
 };
-export type CardDate = {
-  createdDate: string;
-  modifiedDate: string;
-};
 
 export type CardStatus = 'Focused' | 'Blurred';
 
@@ -74,7 +71,7 @@ export class TransformableFeature {
   public geometry: Geometry = DEFAULT_CARD_GEOMETRY;
   public style: CardStyle = DEFAULT_CARD_STYLE;
   public condition: CardCondition = DEFAULT_CARD_CONDITION;
-  public date: CardDate = {
+  public date: CartaDate = {
     createdDate: getCurrentDateAndTime(),
     modifiedDate: getCurrentDateAndTime(),
   };
@@ -84,7 +81,7 @@ export class TransformableFeature {
     _geometry?: Geometry,
     _style?: CardStyle,
     _condition?: CardCondition,
-    _date?: CardDate
+    _date?: CartaDate
   ) {
     if (
       _geometry !== undefined &&
@@ -136,7 +133,7 @@ export type AvatarPropSerializable = {
   geometry: Geometry;
   style: CardStyle;
   condition: CardCondition;
-  date: CardDate;
+  date: CartaDate;
 };
 
 export class AvatarProp extends TransformableFeature {

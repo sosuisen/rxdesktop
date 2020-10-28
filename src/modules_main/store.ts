@@ -28,6 +28,8 @@ import { getIdFromUrl } from '../modules_common/avatar_url_utils';
 import { getCurrentDateAndTime } from '../modules_common/utils';
 import { Workspace, workspaceSchema } from '../modules_common/schema_workspace';
 import { Card, cardSchema } from '../modules_common/schema_card';
+import { Avatar, avatarSchema } from '../modules_common/schema_avatar';
+import { CartaDate } from '../modules_common/types';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 addRxPlugin(require('pouchdb-adapter-leveldb'));
@@ -62,6 +64,11 @@ const collections: CartaCollection[] = [
     sync: true,
   },
   {
+    name: 'avatar',
+    schema: avatarSchema,
+    sync: true,
+  },
+  {
     name: 'card',
     schema: cardSchema,
     sync: true,
@@ -82,7 +89,9 @@ export const dumpDB = async () => {
   console.debug('************* Workspace Local Documents');
   console.dir(await getWorkspaceLocalDocuments(), { depth: null });
   console.debug('************* Workspaces');
-  // console.dir(await getWorkspaces(), { depth: null });
+  console.dir(await getWorkspaces(), { depth: null });
+  console.debug('************* Avatars');
+  console.dir(await getAvatars(), { depth: null });
   console.debug('************* Cards');
   // console.dir(await getCards(), { depth: null });
 };
@@ -179,12 +188,16 @@ const addNewAvatar = () => {
 
 export const loadCurrentWorkspace = async () => {
   // load cards
-  const currentWorkspace = await getCurrentWorkspace().catch(err => {
+  const currentWorkspaceRxDoc: RxDocument = await getCurrentWorkspaceRxDoc().catch(err => {
     throw err;
   });
-  console.dir(currentWorkspace, { depth: null });
+  console.dir(currentWorkspaceRxDoc.toJSON(), { depth: null });
 
-  const avatars: AvatarPropSerializable[] = currentWorkspace.avatars;
+  const avatars: Avatar[] = (((await currentWorkspaceRxDoc.populate(
+    'avatars'
+  )) as unknown) as RxDocument[]).map(avatarDoc => avatarDoc.toJSON() as Avatar);
+
+  console.dir(avatars, { depth: null });
 
   const cardIds = avatars.map(avatar => getIdFromUrl(avatar.url));
   // Be unique
@@ -223,6 +236,7 @@ export const loadCurrentWorkspace = async () => {
     }
   }
   */
+
   console.debug(`Completed to load ${avatars.length} cards`);
 
   if (avatars.length === 0) {
@@ -251,6 +265,36 @@ const createWorkspace = async (name?: string): Promise<Workspace> => {
   return newDoc.toJSON() as Workspace;
 };
 
+const sortByCartaDate = function (a: any, b: any) {
+  if (a.date.createdDate > b.date.createdDate) {
+    return 1;
+  }
+  else if (a.date.createdDate < b.date.createdDate) {
+    return -1;
+  }
+  return 0;
+};
+
+const getSelectedCardsRxDoc = async (cardIds: string[]) => {
+  const cardDocsMap = (await rxdb.collections.card.findByIds(cardIds)) as Map<
+    string,
+    RxDocument
+  >;
+  return [...cardDocsMap.values()];
+};
+
+const getCardsRxDoc = async (cardIds?: string[]): Promise<RxDocument[]> => {
+  let cards: RxDocument[];
+  if (cardIds === undefined) {
+    // All cards
+    cards = await rxdb.collections.card.find().exec();
+  }
+  else {
+    cards = await getSelectedCardsRxDoc(cardIds);
+  }
+  return cards.sort(sortByCartaDate);
+};
+
 const getCards = async (cardIds?: string[]): Promise<Card[]> => {
   let cards: Card[];
   if (cardIds === undefined) {
@@ -258,22 +302,66 @@ const getCards = async (cardIds?: string[]): Promise<Card[]> => {
     cards = ((await rxdb.collections.card.dump()).docs as unknown) as Card[];
   }
   else {
-    // Selected cards
-    const cardDocsMap = (await rxdb.collections.card.findByIds(cardIds)) as Map<
-      string,
-      RxDocument
-    >;
-    cards = [...cardDocsMap.values()].map(cardDoc => cardDoc.toJSON() as Card);
+    cards = (await getSelectedCardsRxDoc(cardIds)).map(cardDoc => cardDoc.toJSON() as Card);
   }
-  return cards.sort(function (a, b) {
-    if (a.date.createdDate > b.date.createdDate) {
-      return 1;
-    }
-    else if (a.date.createdDate < b.date.createdDate) {
-      return -1;
-    }
-    return 0;
-  });
+  return cards.sort(sortByCartaDate);
+};
+
+const getSelectedAvatarsRxDoc = async (avatarIds: string[]) => {
+  const avatarDocsMap = (await rxdb.collections.avatar.findByIds(avatarIds)) as Map<
+    string,
+    RxDocument
+  >;
+  return [...avatarDocsMap.values()];
+};
+
+const getAvatarsRxDoc = async (avatarIds?: string[]): Promise<RxDocument[]> => {
+  let avatars: RxDocument[];
+  if (avatarIds === undefined) {
+    // All cards
+    avatars = await rxdb.collections.avatar.find().exec();
+  }
+  else {
+    avatars = await getSelectedAvatarsRxDoc(avatarIds);
+  }
+  return avatars.sort(sortByCartaDate);
+};
+
+const getAvatars = async (avatarIds?: string[]): Promise<Avatar[]> => {
+  let avatars: Avatar[];
+  if (avatarIds === undefined) {
+    // All cards
+    avatars = ((await rxdb.collections.card.dump()).docs as unknown) as Avatar[];
+  }
+  else {
+    avatars = (await getSelectedAvatarsRxDoc(avatarIds)).map(
+      avatarDoc => avatarDoc.toJSON() as Avatar
+    );
+  }
+  return avatars.sort(sortByCartaDate);
+};
+
+const getSelectedWorkspacesRxDoc = async (workspaceIds: string[]) => {
+  // Selected workspaces
+  const workspaceDocsMap = (await rxdb.collections.workspace.findByIds(
+    workspaceIds
+  )) as Map<string, RxDocument>;
+  return [...workspaceDocsMap.values()];
+};
+
+export const getWorkspacesRxDoc = async (
+  workspaceIds?: string[]
+): Promise<RxDocument[]> => {
+  let workspaces: RxDocument[];
+  if (workspaceIds === undefined) {
+    // All workspaces
+    workspaces = await rxdb.collections.workspace.find().exec();
+  }
+  else {
+    workspaces = await getSelectedWorkspacesRxDoc(workspaceIds);
+  }
+
+  return workspaces.sort(sortByCartaDate);
 };
 
 export const getWorkspaces = async (workspaceIds?: string[]): Promise<Workspace[]> => {
@@ -284,23 +372,12 @@ export const getWorkspaces = async (workspaceIds?: string[]): Promise<Workspace[
   }
   else {
     // Selected workspaces
-    const workspaceDocsMap = (await rxdb.collections.workspace.findByIds(
-      workspaceIds
-    )) as Map<string, RxDocument>;
-    workspaces = [...workspaceDocsMap.values()].map(
+    workspaces = (await getSelectedWorkspacesRxDoc(workspaceIds)).map(
       workspaceDoc => workspaceDoc.toJSON() as Workspace
     );
   }
 
-  return workspaces.sort(function (a, b) {
-    if (a.date.createdDate > b.date.createdDate) {
-      return 1;
-    }
-    else if (a.date.createdDate < b.date.createdDate) {
-      return -1;
-    }
-    return 0;
-  });
+  return workspaces.sort(sortByCartaDate);
 };
 
 const getCurrentWorkspaceId = async (): Promise<string> => {
@@ -328,7 +405,7 @@ const getCurrentWorkspaceId = async (): Promise<string> => {
   return currentWorkspaceDoc.id;
 };
 
-export const getCurrentWorkspace = async (): Promise<Workspace> => {
+export const getCurrentWorkspaceRxDoc = async (): Promise<RxDocument> => {
   const currentWorkspaceId = await getCurrentWorkspaceId().catch(err => {
     console.error(err);
     return '';
@@ -341,7 +418,11 @@ export const getCurrentWorkspace = async (): Promise<Workspace> => {
     throw new Error('No workspace exist');
   }
 
-  return workspace.toJSON() as Workspace;
+  return workspace;
+};
+
+export const getCurrentWorkspace = async (): Promise<Workspace> => {
+  return (await getCurrentWorkspaceRxDoc()).toJSON() as Workspace;
 };
 
 const getWorkspaceLocalDocuments = async () => {
@@ -531,8 +612,8 @@ export const getCardProp = (id: string): Promise<CardProp> => {
             locked: false,
           };
 
-          const { createdDate, modifiedDate } = (doc as unknown) as CardDate;
-          const date: CardDate = { createdDate, modifiedDate };
+          const { createdDate, modifiedDate } = (doc as unknown) as CartaDate;
+          const date: CartaDate = { createdDate, modifiedDate };
 
           propsRequired.avatars[getCurrentWorkspaceUrl()] = new TransformableFeature(
             geometry,
@@ -606,7 +687,7 @@ export const updateOrCreateCardData = (prop: CardProp): Promise<string> => {
       return res.id;
     })
     .catch(e => {
-      throw new Error(`Error in updateOrCreateCardDate: ${e.message}`);
+      throw new Error(`Error in updateOrCreateCartaDate: ${e.message}`);
     });
     */
 };
@@ -703,9 +784,29 @@ export const exportJSON = (filepath: string) => {
 export const importJSON = async (filepath: string) => {
   console.debug('Start import JSON from ' + filepath);
   const jsonObj = JSON.parse(readFileSync(filepath).toLocaleString());
+
+  const workspaces = (jsonObj['workspace']['spaces'] as { [key: string]: any }[]).map(
+    workspace => {
+      const newWorkspace = JSON.parse(JSON.stringify(workspace));
+      newWorkspace.avatars = (workspace.avatars as { [key: string]: any }[]).map(
+        avatar => avatar.url
+      );
+      return newWorkspace;
+    }
+  );
+  // console.dir(workspaces, { depth: null });
+
+  const avatars: { [key: string]: any } = [];
+  (jsonObj['workspace']['spaces'] as { [key: string]: any }[]).forEach(workspace => {
+    avatars.push(...workspace.avatars);
+  });
+  // console.dir(avatars);
+
   try {
     // @ts-ignore
-    await rxdb.collections.workspace.bulkInsert(jsonObj['workspace']['spaces']);
+    await rxdb.collections.workspace.bulkInsert(workspaces);
+    // @ts-ignore
+    await rxdb.collections.avatar.bulkInsert(avatars);
     // @ts-ignore
     await rxdb.collections.card.bulkInsert(jsonObj['card']['cards']);
   } catch (e) {
