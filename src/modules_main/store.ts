@@ -86,11 +86,13 @@ const insertWorkspaceLocalDoc = async (
 const getWorkspaceLocalDoc = async <T extends WorkspaceLocalDocument>(
   id: WorkspaceLocalDocumentId
 ): Promise<T> => {
-  return ((
-    await rxdb.workspace.getLocal(id).catch(e => {
-      throw new Error(e);
-    })
-  ).toJSON() as unknown) as T;
+  const docRx = await rxdb.workspace.getLocal(id).catch(e => {
+    throw new Error(e);
+  });
+  if (docRx === null) {
+    return null;
+  }
+  return (docRx.toJSON() as unknown) as T;
 };
 
 const getAllWorkspaceLocalDocs = async (): Promise<WorkspaceLocalDocument[]> => {
@@ -295,7 +297,7 @@ const getCurrentWorkspaceId = async (): Promise<string> => {
   ).catch(e => {
     throw new Error(e);
   });
-  if (!currentWorkspaceDoc || !currentWorkspaceDoc.id) {
+  if (currentWorkspaceDoc === null || !currentWorkspaceDoc.id) {
     const workspaces = await getDocs<Workspace>(getCollection('workspace'));
     if (workspaces.length === 0) {
       throw new Error('No workspace exists.');
