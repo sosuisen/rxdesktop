@@ -26,6 +26,7 @@ import { Workspace, workspaceSchema } from '../modules_common/schema_workspace';
 import { Card, cardSchema } from '../modules_common/schema_card';
 import { Avatar, avatarSchema } from '../modules_common/schema_avatar';
 import { CartaDocument } from '../modules_common/types';
+import { getDocs } from './store_utils';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 addRxPlugin(require('pouchdb-adapter-leveldb'));
@@ -37,8 +38,6 @@ let rxdb: RxDatabase;
  */
 const dbName = 'cartadb';
 const WORKSPACE_VERSION = 0;
-
-type CartaTypes = Workspace | Avatar | Card;
 
 const collectionNames = ['workspace', 'avatar', 'card'] as const;
 type CollectionName = typeof collectionNames[number];
@@ -117,11 +116,11 @@ export const dumpDB = async () => {
   console.debug('************* Workspace Local Documents');
   console.dir(await getAllWorkspaceLocalDocs(), { depth: null });
   console.debug('************* Workspaces');
-  console.dir(await getDocs<Workspace>('workspace'), { depth: null });
+  console.dir(await getDocs<Workspace>(getCollection('workspace')), { depth: null });
   console.debug('************* Avatars');
-  console.dir(await getDocs<Avatar>('avatar'), { depth: null });
+  console.dir(await getDocs<Avatar>(getCollection('avatar')), { depth: null });
   console.debug('************* Cards');
-  // console.dir(await getDocs<Card>('card'), { depth: null });
+  // console.dir(await getDocs<Card>(getCollection('card')), { depth: null });
 };
 
 export const openDB = async () => {
@@ -187,98 +186,14 @@ export const prepareDbSync = () => {
   }
 };
 
-/**
- * Get RxDB documents
- */
-const getDocsRx = async (
-  collectionName: CollectionName,
-  ids?: string[],
-  sortFunc?: (a: any, b: any) => number
-): Promise<RxDocument[]> => {
-  const collection = rxdb[collectionName];
-  try {
-    return (ids === undefined
-      ? await getAllDocsRx(collection)
-      : await getSelectedDocsRx(collection, ids)
-    ).sort(sortFunc ?? sortByCartaDate);
-  } catch (e) {
-    throw new Error(e);
-  }
-};
-
-/**
- * Get plain objects
- */
-export const getDocs = async <T extends CartaTypes>(
-  collectionName: CollectionName,
-  ids?: string[],
-  sortFunc?: (a: any, b: any) => number
-): Promise<T[]> => {
-  const collection = rxdb[collectionName];
-  try {
-    return ((ids === undefined
-      ? await getAllDocs(collection)
-      : await getSelectedDocs(collection, ids)
-    ).sort(sortFunc ?? sortByCartaDate) as unknown) as T[];
-  } catch (e) {
-    throw new Error(e);
-  }
-};
-
-// ! Utils for get documents
-
-const sortByCartaDate = function (a: any, b: any) {
-  if (a.date.createdDate > b.date.createdDate) {
-    return 1;
-  }
-  else if (a.date.createdDate < b.date.createdDate) {
-    return -1;
-  }
-  return 0;
-};
-
-const getAllDocsRx = async (collection: RxCollection): Promise<RxDocument[]> => {
-  return await collection
-    .find()
-    .exec()
-    .catch(e => {
-      throw new Error(e);
-    });
-};
-
-const getSelectedDocsRx = async (
-  collection: RxCollection,
-  ids: string[]
-): Promise<RxDocument[]> => {
-  const cardDocsMap = (await collection.findByIds(ids).catch(e => {
-    throw new Error(e);
-  })) as Map<string, RxDocument>;
-  return [...cardDocsMap.values()];
-};
-
-const getAllDocs = async (collection: RxCollection): Promise<CartaDocument[]> => {
-  // dump() is faster than find() and toJSON()
-  try {
-    return ((await collection.dump()).docs as unknown) as CartaDocument[];
-  } catch (e) {
-    throw new Error(e);
-  }
-};
-
-const getSelectedDocs = async (
-  collection: RxCollection,
-  ids: string[]
-): Promise<CartaDocument[]> => {
-  const cardDocsMap = (await collection.findByIds(ids).catch(e => {
-    throw new Error(e);
-  })) as Map<string, RxDocument>;
-  return [...cardDocsMap.values()].map(doc => doc.toJSON()) as CartaDocument[];
+const getCollection = (collectionName: CollectionName) => {
+  return rxdb[collectionName];
 };
 
 // ! Operations for workspace
 
 export const getWorkspaces = async (): Promise<Workspace[]> => {
-  return await getDocs<Workspace>('workspace');
+  return await getDocs<Workspace>(getCollection('workspace'));
 };
 
 export const loadCurrentWorkspace = async () => {
@@ -324,7 +239,7 @@ export const loadCurrentWorkspace = async () => {
   const cardIds = avatars.map(avatar => getIdFromUrl(avatar.url));
   // Be unique
   const uniqueCardIds = [...new Set(cardIds)];
-  const cards = await getDocs<Card>('card', uniqueCardIds).catch(err => {
+  const cards = await getDocs<Card>(getCollection('card'), uniqueCardIds).catch(err => {
     throw err;
   });
 
@@ -381,7 +296,7 @@ const getCurrentWorkspaceId = async (): Promise<string> => {
     throw new Error(e);
   });
   if (!currentWorkspaceDoc || !currentWorkspaceDoc.id) {
-    const workspaces = await getDocs<Workspace>('workspace');
+    const workspaces = await getDocs<Workspace>(getCollection('workspace'));
     if (workspaces.length === 0) {
       throw new Error('No workspace exists.');
     }
@@ -417,7 +332,7 @@ export const getCurrentWorkspace = async (): Promise<Workspace> => {
 
 const createWorkspace = async (name?: string): Promise<Workspace> => {
   if (!name) {
-    const workspaces = getDocs<Workspace>('workspace');
+    const workspaces = getDocs<Workspace>(getCollection('workspace'));
     name = MESSAGE('workspaceName', ((await workspaces).length + 1).toString());
   }
   const newID = 'w' + nanoid();
