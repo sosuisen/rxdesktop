@@ -10,3 +10,7 @@ export type CartaDate = {
   createdDate: string;
   modifiedDate: string;
 };
+
+export type CartaDocument = {
+  date: CartaDate;
+};

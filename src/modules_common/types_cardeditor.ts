@@ -61,7 +61,8 @@ export const contentsFrameCommand = [
   'contents-frame-file-dropped',
   'check-initializing',
   'contents-frame-initialized',
-];
+  '',
+] as const;
 // ContentsFrameCommand is union. e.g) 'overwrite-iframe' | 'click-parent' | ...
 // Use ContentsFrameCommand to check type.
 // Use below to iterate ContentsFrameCommands:
