@@ -38,6 +38,7 @@ import {
   prepareDbSync,
   updateWorkspaceStatus,
 } from './modules_main/store';
+import { avatarWindows } from './modules_main/avatar_window';
 
 // process.on('unhandledRejection', console.dir);
 
@@ -134,9 +135,9 @@ ipcMain.handle('delete-card', async (event, url: string) => {
 });
 
 ipcMain.handle('finish-render-card', (event, url: string) => {
-  const avatar = avatars.get(url);
-  if (avatar) {
-    avatar.renderingCompleted = true;
+  const avatarWindow = avatarWindows.get(url);
+  if (avatarWindow) {
+    avatarWindow.renderingCompleted = true;
   }
 });
 

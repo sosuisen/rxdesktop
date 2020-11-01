@@ -12,7 +12,6 @@ import { nanoid } from 'nanoid';
 import {
   addRxPlugin,
   createRxDatabase,
-  RxCollection,
   RxCollectionCreator,
   RxDatabase,
   RxDocument,
@@ -25,8 +24,8 @@ import { getCurrentDateAndTime } from '../modules_common/utils';
 import { Workspace, workspaceSchema } from '../modules_common/schema_workspace';
 import { Card, cardSchema } from '../modules_common/schema_card';
 import { Avatar, avatarSchema } from '../modules_common/schema_avatar';
-import { CartaDocument } from '../modules_common/types';
 import { getDocs } from './store_utils';
+import { AvatarWindow, createAvatarWindows } from './avatar_window';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 addRxPlugin(require('pouchdb-adapter-leveldb'));
@@ -85,7 +84,7 @@ const insertWorkspaceLocalDoc = async (
 
 const getWorkspaceLocalDoc = async <T extends WorkspaceLocalDocument>(
   id: WorkspaceLocalDocumentId
-): Promise<T> => {
+): Promise<T | null> => {
   const docRx = await rxdb.workspace.getLocal(id).catch(e => {
     throw new Error(e);
   });
@@ -230,13 +229,13 @@ export const loadCurrentWorkspace = async () => {
     currentWorkspaceRx = docOrError;
   }
 
-  console.dir(currentWorkspaceRx.toJSON(), { depth: null });
+  // console.dir(currentWorkspaceRx.toJSON(), { depth: null });
 
   const avatars: Avatar[] = (((await currentWorkspaceRx.populate(
     'avatars'
   )) as unknown) as RxDocument[]).map(avatarDoc => avatarDoc.toJSON() as Avatar);
 
-  console.dir(avatars, { depth: null });
+  //  console.dir(avatars, { depth: null });
 
   const cardIds = avatars.map(avatar => getIdFromUrl(avatar.url));
   // Be unique
@@ -244,16 +243,18 @@ export const loadCurrentWorkspace = async () => {
   const cards = await getDocs<Card>(getCollection('card'), uniqueCardIds).catch(err => {
     throw err;
   });
+  const cardMap = new Map<string, Card>();
+  uniqueCardIds.forEach(id => {
+    const index = cards.findIndex(card => card.id === id);
+    if (index >= 0) {
+      cardMap.set(id, cards[index]);
+    }
+  });
 
   //  console.dir(cards, { depth: null });
 
-  // TODO: Render avatars
-  /*
-  const renderers = [...avatars.values()].map(avatar => avatar.render());
-  await Promise.all(renderers).catch(e => {
-    console.error(`Error while rendering cards in ready event: ${e.message}`);
-  });
-  */
+  createAvatarWindows(cardMap, avatars);
+
   // TODO: Arrange avatars
   /*
   const backToFront = [...avatars.keys()].sort((a, b) => {

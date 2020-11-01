@@ -44,6 +44,8 @@ import window from './modules_renderer/window';
 import { getLocationFromUrl } from './modules_common/avatar_url_utils';
 import { getCurrentWorkspaceUrl } from './modules_main/store_workspaces';
 import { setAltDown, setCtrlDown, setMetaDown, setShiftDown } from './modules_common/keys';
+import { Card } from './modules_common/schema_card';
+import { Avatar } from './modules_common/schema_avatar';
 
 let avatarProp: AvatarProp = new AvatarProp('');
 
@@ -338,7 +340,7 @@ window.addEventListener('message', event => {
       onMoveByHand(event.data.bounds);
       break;
     case 'render-card':
-      onRenderCard(event.data.prop);
+      onRenderCard(event.data.card, event.data.avatar);
       break;
     case 'resize-by-hand':
       onResizeByHand(event.data.bounds);
@@ -423,7 +425,11 @@ const onMoveByHand = (newBounds: {
 };
 
 // Render card data
-const onRenderCard = (_prop: AvatarPropSerializable) => {
+const onRenderCard = (card: Card, avatar: Avatar) => {
+  const _prop: AvatarPropSerializable = {
+    ...avatar,
+    data: card.data,
+  };
   avatarProp = AvatarProp.fromObject(_prop);
 
   initCardRenderer(avatarProp, cardCssStyle, cardEditor);

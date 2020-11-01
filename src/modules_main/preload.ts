@@ -104,8 +104,10 @@ ipcRenderer.on(
   (event: Electron.IpcRendererEvent, _bounds: Electron.Rectangle) =>
     window.postMessage({ command: 'move-by-hand', bounds: _bounds }, 'file://')
 );
-ipcRenderer.on('render-card', (event: Electron.IpcRendererEvent, _prop: any) =>
-  window.postMessage({ command: 'render-card', prop: _prop }, 'file://')
+ipcRenderer.on(
+  'render-card',
+  (event: Electron.IpcRendererEvent, _card: any, _avatar: any) =>
+    window.postMessage({ command: 'render-card', card: _card, avatar: _avatar }, 'file://')
 );
 ipcRenderer.on(
   'resize-by-hand',
