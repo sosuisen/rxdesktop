@@ -1,4 +1,6 @@
 // For TypeScript
+type AvatarUrl = string;
+
 export type Workspace = {
   id: string;
   name: string;
@@ -7,7 +9,7 @@ export type Workspace = {
     modifiedDate: string;
   };
   version: number;
-  avatars: string[];
+  avatars: AvatarUrl[];
 };
 
 // For RxDB
