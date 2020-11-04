@@ -1,13 +1,39 @@
-import { CardCondition, CardStyle, Geometry } from './cardprop';
 import { CartaDate } from './types';
+
+export type Geometry = {
+  x: number;
+  y: number;
+  z: number;
+  width: number;
+  height: number;
+};
+
+/**
+ * CardStyle
+ * Visual style of a card
+ */
+export type AvatarStyle = {
+  uiColor: string;
+  backgroundColor: string;
+  opacity: number;
+  zoom: number;
+};
+
+/**
+ * CardCondition
+ * Serializable condition of a card
+ */
+export type AvatarCondition = {
+  locked: boolean;
+};
 
 // For TypeScript
 export type Avatar = {
   url: string;
   data: string;
   geometry: Geometry;
-  style: CardStyle;
-  condition: CardCondition;
+  style: AvatarStyle;
+  condition: AvatarCondition;
   date: CartaDate;
   version: number;
 };

@@ -23,10 +23,7 @@ import { getSettings, globalDispatch, MESSAGE } from './store_settings';
 import { getIdFromUrl } from '../modules_common/avatar_url_utils';
 import { handlers } from './event';
 import { cardColors, ColorName } from '../modules_common/color';
-import {
-  getCurrentWorkspaceId,
-  workspaces,
-} from './store_workspaces';
+import { getCurrentWorkspaceId, workspaces } from './store_workspaces';
 import { Avatar } from '../modules_common/schema_avatar';
 import { Card } from '../modules_common/schema_card';
 

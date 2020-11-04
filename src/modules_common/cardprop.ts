@@ -10,6 +10,7 @@ import { getCurrentDateAndTime } from './utils';
 import { cardColors, darkenHexColor } from './color';
 import { getCurrentWorkspaceUrl } from '../modules_main/store_workspaces';
 import { CartaDate } from './types';
+import { Avatar, AvatarCondition, AvatarStyle, Geometry } from './schema_avatar';
 
 export const cardVersion = '1.0';
 
@@ -17,34 +18,10 @@ export const cardVersion = '1.0';
 //  private _DRAG_IMAGE_MARGIN = 20;
 export const DRAG_IMAGE_MARGIN = 50;
 
-export type Geometry = {
-  x: number;
-  y: number;
-  z: number;
-  width: number;
-  height: number;
-};
 export type CardBase = {
   version: string;
   id: string;
   data: string;
-};
-/**
- * CardStyle
- * Visual style of a card
- */
-export type CardStyle = {
-  uiColor: string;
-  backgroundColor: string;
-  opacity: number;
-  zoom: number;
-};
-/**
- * CardCondition
- * Serializable condition of a card
- */
-export type CardCondition = {
-  locked: boolean;
 };
 
 export type CardStatus = 'Focused' | 'Blurred';
@@ -56,21 +33,21 @@ export const DEFAULT_CARD_GEOMETRY: Geometry = {
   width: 300,
   height: 300,
 };
-export const DEFAULT_CARD_STYLE: CardStyle = {
+export const DEFAULT_CARD_STYLE: AvatarStyle = {
   uiColor: '',
   backgroundColor: cardColors.yellow,
   opacity: 1.0,
   zoom: 1.0,
 };
-export const DEFAULT_CARD_CONDITION: CardCondition = {
+export const DEFAULT_CARD_CONDITION: AvatarCondition = {
   locked: false,
 };
 DEFAULT_CARD_STYLE.uiColor = darkenHexColor(DEFAULT_CARD_STYLE.backgroundColor);
 
 export class TransformableFeature {
   public geometry: Geometry = DEFAULT_CARD_GEOMETRY;
-  public style: CardStyle = DEFAULT_CARD_STYLE;
-  public condition: CardCondition = DEFAULT_CARD_CONDITION;
+  public style: AvatarStyle = DEFAULT_CARD_STYLE;
+  public condition: AvatarCondition = DEFAULT_CARD_CONDITION;
   public date: CartaDate = {
     createdDate: getCurrentDateAndTime(),
     modifiedDate: getCurrentDateAndTime(),
@@ -79,8 +56,8 @@ export class TransformableFeature {
   // eslint-disable-next-line complexity
   constructor (
     _geometry?: Geometry,
-    _style?: CardStyle,
-    _condition?: CardCondition,
+    _style?: AvatarStyle,
+    _condition?: AvatarCondition,
     _date?: CartaDate
   ) {
     if (
@@ -127,14 +104,7 @@ export type CardAvatars = { [key: string]: TransformableFeature };
 // Each of them must have unique name to be able to use as a key when serialize.
 export type CardPropSerializable = CardBase & { avatars: CardAvatars };
 
-export type AvatarPropSerializable = {
-  url: string;
-  data: string;
-  geometry: Geometry;
-  style: CardStyle;
-  condition: CardCondition;
-  date: CartaDate;
-};
+export type AvatarPropSerializable = Omit<Avatar, 'version'>;
 
 export class AvatarProp extends TransformableFeature {
   public version = cardVersion;
