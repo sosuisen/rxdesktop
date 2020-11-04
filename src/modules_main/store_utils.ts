@@ -8,7 +8,6 @@
  */
 
 import { RxCollection, RxDocument } from 'rxdb';
-import { rxdb } from 'rxdb/dist/types/plugins/key-compression';
 import { Avatar } from '../modules_common/schema_avatar';
 import { Card } from '../modules_common/schema_card';
 import { CartaDocument } from '../modules_common/types';

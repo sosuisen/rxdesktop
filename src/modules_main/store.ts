@@ -25,7 +25,7 @@ import { Workspace, workspaceSchema } from '../modules_common/schema_workspace';
 import { Card, cardSchema } from '../modules_common/schema_card';
 import { Avatar, avatarSchema } from '../modules_common/schema_avatar';
 import { getDocs } from './store_utils';
-import { AvatarWindow, createAvatarWindows } from './avatar_window';
+import { createAvatarWindows } from './avatar_window';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 addRxPlugin(require('pouchdb-adapter-leveldb'));

@@ -18,17 +18,13 @@ import {
   shell,
 } from 'electron';
 import contextMenu from 'electron-context-menu';
-import { AvatarProp, AvatarPropSerializable } from '../modules_common/cardprop';
 import { DialogButton } from '../modules_common/const';
 import { getSettings, globalDispatch, MESSAGE } from './store_settings';
-import { getIdFromUrl, getLocationFromUrl } from '../modules_common/avatar_url_utils';
+import { getIdFromUrl } from '../modules_common/avatar_url_utils';
 import { handlers } from './event';
 import { cardColors, ColorName } from '../modules_common/color';
 import {
-  addAvatarToWorkspace,
   getCurrentWorkspaceId,
-  getWorkspaceUrl,
-  removeAvatarFromWorkspace,
   workspaces,
 } from './store_workspaces';
 import { Avatar } from '../modules_common/schema_avatar';
