@@ -28,6 +28,7 @@ import {
 } from './store_workspaces';
 import { appIcon } from '../modules_common/const';
 import { getCurrentWorkspace, getWorkspaces } from './store';
+import { avatarWindows } from './avatar_window';
 
 /**
  * Task tray
@@ -269,7 +270,7 @@ export const setTrayContextMenu = async () => {
     },
     {
       label: MESSAGE('exit'),
-      click: () => {
+      click: async () => {
         if (!currentWorkspace) {
           return;
         }
@@ -283,13 +284,12 @@ export const setTrayContextMenu = async () => {
         }
         else {
           try {
-            /** 
-             * TODO:
-             
-            avatars.forEach(avatar => avatar.window.webContents.send('card-close'));
-            */
+            (await getCurrentWorkspace()).avatars.forEach(url =>
+              avatarWindows.get(url)!.window.webContents.send('card-close')
+            );
           } catch (e) {
             console.error(e);
+            emitter.emit('exit');
           }
         }
       },
