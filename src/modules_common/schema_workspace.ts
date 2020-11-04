@@ -1,5 +1,5 @@
 // For TypeScript
-type AvatarUrl = string;
+export type AvatarUrl = string;
 
 export type Workspace = {
   id: string;

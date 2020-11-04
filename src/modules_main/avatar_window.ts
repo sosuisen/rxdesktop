@@ -26,6 +26,7 @@ import { cardColors, ColorName } from '../modules_common/color';
 import { getCurrentWorkspaceId, workspaces } from './store_workspaces';
 import { Avatar } from '../modules_common/schema_avatar';
 import { Card } from '../modules_common/schema_card';
+import { AvatarUrl } from '../modules_common/schema_workspace';
 
 /**
  * Const
@@ -33,7 +34,10 @@ import { Card } from '../modules_common/schema_card';
 const MINIMUM_WINDOW_WIDTH = 185; // 180 + shadowWidth
 const MINIMUM_WINDOW_HEIGHT = 80;
 
-export const avatarWindows: Map<string, AvatarWindow> = new Map<string, AvatarWindow>();
+export const avatarWindows: Map<AvatarUrl, AvatarWindow> = new Map<
+  AvatarUrl,
+  AvatarWindow
+>();
 /**
  * Focus control
  */
