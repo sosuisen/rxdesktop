@@ -21,12 +21,13 @@ import contextMenu from 'electron-context-menu';
 import { DialogButton } from '../modules_common/const';
 import { getSettings, globalDispatch, MESSAGE } from './store_settings';
 import { getIdFromUrl } from '../modules_common/avatar_url_utils';
-import { handlers } from './event';
+import { emitter, handlers } from './event';
 import { cardColors, ColorName } from '../modules_common/color';
 import { getCurrentWorkspaceId, workspaces } from './store_workspaces';
-import { Avatar } from '../modules_common/schema_avatar';
+import { Avatar, Geometry } from '../modules_common/schema_avatar';
 import { Card } from '../modules_common/schema_card';
 import { AvatarUrl } from '../modules_common/schema_workspace';
+import { AvatarGeometryUpdateAction } from '../modules_common/store.types';
 
 /**
  * Const
@@ -465,12 +466,32 @@ export class AvatarWindow {
     });
   }
 
+  private _sendGeometryDispatch = (newBounds: Electron.Rectangle) => {
+    const geometry: Partial<Geometry> = {
+      x: newBounds.x,
+      y: newBounds.y,
+      z: undefined,
+      width: newBounds.width,
+      height: newBounds.height,
+    };
+    const action: AvatarGeometryUpdateAction = {
+      type: 'avatar-geometry-update',
+      payload: {
+        url: this.url,
+        geometry,
+      },
+    };
+    emitter.emit('persistent-store-dispatch', action);
+  };
+
   private _willMoveListener = (event: Electron.Event, newBounds: Electron.Rectangle) => {
-    this.window.webContents.send('move-by-hand', newBounds);
+    // this.window.webContents.send('move-by-hand', newBounds);
+    this._sendGeometryDispatch(newBounds);
   };
 
   private _willResizeListener = (event: Electron.Event, newBounds: Electron.Rectangle) => {
-    this.window.webContents.send('resize-by-hand', newBounds);
+    // this.window.webContents.send('resize-by-hand', newBounds);
+    this._sendGeometryDispatch(newBounds);
   };
 
   private _closedListener = () => {
@@ -491,6 +512,7 @@ export class AvatarWindow {
 
   // @ts-ignore
   private _focusListener = e => {
+    /*
     if (this.recaptureGlobalFocusEventAfterLocalFocusEvent) {
       this.recaptureGlobalFocusEventAfterLocalFocusEvent = false;
       setGlobalFocusEventListenerPermission(true);
@@ -506,9 +528,11 @@ export class AvatarWindow {
       console.debug(`focus ${this.url}`);
       this.window.webContents.send('card-focused');
     }
+    */
   };
 
   private _blurListener = () => {
+    /*
     if (this.suppressBlurEventOnce) {
       console.debug(`skip blur event listener ${this.url}`);
       this.suppressBlurEventOnce = false;
@@ -517,6 +541,7 @@ export class AvatarWindow {
       console.debug(`blur ${this.url}`);
       this.window.webContents.send('card-blurred');
     }
+    */
   };
 
   public removeWindowListeners = () => {

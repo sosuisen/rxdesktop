@@ -27,7 +27,7 @@ import {
   PersistentSettingsStateKeys,
   TemporalSettingsAction,
   TemporalSettingsState,
-} from '../modules_common/store.types';
+} from '../modules_common/store_settings.types';
 import { appIcon } from '../modules_common/const';
 
 /**

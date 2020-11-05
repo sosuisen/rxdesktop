@@ -8,6 +8,7 @@
 
 import { MessageLabel } from '../modules_common/i18n';
 import { AvatarPropSerializable } from '../modules_common/cardprop';
+import { PersistentStoreAction } from '../modules_common/store.types';
 
 interface WindowWithAPI extends Window {
   api: {
@@ -27,6 +28,7 @@ interface WindowWithAPI extends Window {
     finishRenderCard: (url: string) => Promise<void>;
     focus: (url: string) => Promise<void>;
     getUuid: () => Promise<string>;
+    persistentStoreDispatch: (action: PersistentStoreAction) => Promise<void>;
     updateAvatar: (avatarPropSerializable: AvatarPropSerializable) => Promise<void>;
     sendLeftMouseDown: (url: string, x: number, y: number) => Promise<void>;
     sendToBack: (url: string) => Promise<number>;

@@ -17,15 +17,18 @@ import {
   RxDocument,
 } from 'rxdb';
 import leveldown from 'leveldown';
+import { ipcMain } from 'electron';
 import { CardProp } from '../modules_common/cardprop';
 import { getSettings, MESSAGE } from './store_settings';
 import { getIdFromUrl } from '../modules_common/avatar_url_utils';
 import { getCurrentDateAndTime } from '../modules_common/utils';
 import { Workspace, workspaceSchema } from '../modules_common/schema_workspace';
 import { Card, cardSchema } from '../modules_common/schema_card';
-import { Avatar, avatarSchema } from '../modules_common/schema_avatar';
+import { Avatar, avatarSchema, Geometry } from '../modules_common/schema_avatar';
 import { getDocs } from './store_utils';
 import { createAvatarWindows } from './avatar_window';
+import { PersistentStoreAction } from '../modules_common/store.types';
+import { emitter } from './event';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 addRxPlugin(require('pouchdb-adapter-leveldb'));
@@ -85,20 +88,20 @@ const insertWorkspaceLocalDoc = async (
 const getWorkspaceLocalDoc = async <T extends WorkspaceLocalDocument>(
   id: WorkspaceLocalDocumentId
 ): Promise<T | null> => {
-  const docRx = await rxdb.workspace.getLocal(id).catch(e => {
+  const docRx = await rxdb.workspace.getLocal<T>(id).catch(e => {
     throw new Error(e);
   });
   if (docRx === null) {
     return null;
   }
-  return (docRx.toJSON() as unknown) as T;
+  return docRx.toJSON();
 };
 
 const getAllWorkspaceLocalDocs = async (): Promise<WorkspaceLocalDocument[]> => {
   const documents: WorkspaceLocalDocument[] = [];
   for (const id of workspaceLocalDocumentIds) {
     // eslint-disable-next-line no-await-in-loop, prettierx/options
-    documents.push((await rxdb.workspace.getLocal(id))?.toJSON() as unknown as WorkspaceLocalDocument);
+    documents.push((await rxdb.workspace.getLocal<WorkspaceLocalDocument>(id))?.toJSON());
   }
   return documents;
 };
@@ -758,3 +761,39 @@ export const importJSON = async (filepath: string) => {
   }
   console.debug('Finished');
 };
+
+const actionHandler = async (action: PersistentStoreAction) => {
+  switch (action.type) {
+    case 'avatar-geometry-update': {
+      const url: string = action.payload.url;
+      const geometry: Partial<Geometry> = action.payload.geometry;
+      const docRx: RxDocument = await rxdb.avatar.findOne(url).exec();
+      if (docRx) {
+        await docRx.atomicUpdate(oldDoc => {
+          const avatar = (oldDoc as unknown) as Avatar;
+          avatar.geometry.x = geometry.x ?? avatar.geometry.x;
+          avatar.geometry.y = geometry.y ?? avatar.geometry.y;
+          avatar.geometry.z = geometry.z ?? avatar.geometry.z;
+          avatar.geometry.width = geometry.width ?? avatar.geometry.width;
+          avatar.geometry.height = geometry.height ?? avatar.geometry.height;
+          return avatar;
+        });
+      }
+      else {
+        console.error(`Error: ${url} does not exist in DB`);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+};
+
+ipcMain.handle(
+  'persistent-store-dispatch',
+  async (event: any, action: PersistentStoreAction) => await actionHandler(action)
+); // from renderer
+emitter.on(
+  'persistent-store-dispatch',
+  async (action: PersistentStoreAction) => await actionHandler(action)
+); // from main

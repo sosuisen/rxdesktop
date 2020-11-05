@@ -15,7 +15,7 @@ import { MenuItemProps } from './MenuItem';
 import { SettingPageTemplate } from './SettingPageTemplate';
 import { MessageLabel } from '../modules_common/i18n';
 import { ColorName, uiColors } from '../modules_common/color';
-import { cardDirName } from '../modules_common/store.types';
+import { cardDirName } from '../modules_common/store_settings.types';
 import { DialogButton } from '../modules_common/const';
 import { getCurrentDateAndTime } from '../modules_common/utils';
 

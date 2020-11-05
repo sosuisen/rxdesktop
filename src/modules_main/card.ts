@@ -45,7 +45,7 @@ import {
   getLocationFromUrl,
   getWorkspaceIdFromUrl,
 } from '../modules_common/avatar_url_utils';
-import { handlers } from './event';
+import { emitter, handlers } from './event';
 import { settingsDialog } from './settings';
 import {
   addAvatarUrl,
@@ -54,6 +54,8 @@ import {
   getCardProp,
   updateOrCreateCardData,
 } from './store';
+import { AvatarGeometryUpdateAction } from '../modules_common/store.types';
+import { Geometry } from '../modules_common/schema_avatar';
 
 /**
  * Card
@@ -513,18 +515,7 @@ export class Avatar {
 
     // this.window.webContents.openDevTools();
 
-    // Resized by hand
-    // will-resize is only emitted when the window is being resized manually.
-    // Resizing the window with setBounds/setSize will not emit this event.
-    this.window.on('will-resize', this._willResizeListener);
-
-    // Moved by hand
-    this.window.on('will-move', this._willMoveListener);
-
     this.window.on('closed', this._closedListener);
-
-    this.window.on('focus', this._focusListener);
-    this.window.on('blur', this._blurListener);
 
     this.resetContextMenu = setContextMenu(this.prop, this.window);
 
@@ -655,14 +646,6 @@ export class Avatar {
     });
   }
 
-  private _willMoveListener = (event: Electron.Event, newBounds: Electron.Rectangle) => {
-    this.window.webContents.send('move-by-hand', newBounds);
-  };
-
-  private _willResizeListener = (event: Electron.Event, newBounds: Electron.Rectangle) => {
-    this.window.webContents.send('resize-by-hand', newBounds);
-  };
-
   private _closedListener = () => {
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
@@ -679,46 +662,8 @@ export class Avatar {
     }
   };
 
-  // @ts-ignore
-  private _focusListener = e => {
-    if (this.recaptureGlobalFocusEventAfterLocalFocusEvent) {
-      this.recaptureGlobalFocusEventAfterLocalFocusEvent = false;
-      setGlobalFocusEventListenerPermission(true);
-    }
-    if (this.suppressFocusEventOnce) {
-      console.debug(`skip focus event listener ${this.prop.url}`);
-      this.suppressFocusEventOnce = false;
-    }
-    else if (!getGlobalFocusEventListenerPermission()) {
-      console.debug(`focus event listener is suppressed ${this.prop.url}`);
-    }
-    else {
-      console.debug(`focus ${this.prop.url}`);
-      this.window.webContents.send('card-focused');
-    }
-  };
-
-  private _blurListener = () => {
-    if (this.suppressBlurEventOnce) {
-      console.debug(`skip blur event listener ${this.prop.url}`);
-      this.suppressBlurEventOnce = false;
-    }
-    else {
-      console.debug(`blur ${this.prop.url}`);
-      this.window.webContents.send('card-blurred');
-    }
-  };
-
   public removeWindowListeners = () => {
-    this.removeWindowListenersExceptClosedEvent();
     this.window.off('closed', this._closedListener);
-  };
-
-  public removeWindowListenersExceptClosedEvent = () => {
-    this.window.off('will-resize', this._willResizeListener);
-    this.window.off('will-move', this._willMoveListener);
-    this.window.off('focus', this._focusListener);
-    this.window.off('blur', this._blurListener);
   };
 
   public render = async () => {
