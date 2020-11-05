@@ -27,7 +27,10 @@ import { getCurrentWorkspaceId, workspaces } from './store_workspaces';
 import { Avatar, Geometry } from '../modules_common/schema_avatar';
 import { Card } from '../modules_common/schema_card';
 import { AvatarUrl } from '../modules_common/schema_workspace';
-import { AvatarGeometryUpdateAction } from '../modules_common/store.types';
+import {
+  AvatarPositionUpdateAction,
+  AvatarSizeUpdateAction,
+} from '../modules_common/store.types';
 
 /**
  * Const
@@ -311,7 +314,7 @@ export class AvatarWindow {
     });
     this.window.setMaxListeners(20);
 
-    // this.window.webContents.openDevTools();
+    this.window.webContents.openDevTools();
 
     // Resized by hand
     // will-resize is only emitted when the window is being resized manually.
@@ -466,32 +469,38 @@ export class AvatarWindow {
     });
   }
 
-  private _sendGeometryDispatch = (newBounds: Electron.Rectangle) => {
-    const geometry: Partial<Geometry> = {
-      x: newBounds.x,
-      y: newBounds.y,
-      z: undefined,
-      width: newBounds.width,
-      height: newBounds.height,
-    };
-    const action: AvatarGeometryUpdateAction = {
-      type: 'avatar-geometry-update',
+  private _willMoveListener = (event: Electron.Event, newBounds: Electron.Rectangle) => {
+    // this.window.webContents.send('move-by-hand', newBounds);
+    // update x and y
+    const action: AvatarPositionUpdateAction = {
+      type: 'avatar-position-update',
       payload: {
         url: this.url,
-        geometry,
+        geometry: {
+          x: newBounds.x,
+          y: newBounds.y,
+        },
       },
     };
     emitter.emit('persistent-store-dispatch', action);
   };
 
-  private _willMoveListener = (event: Electron.Event, newBounds: Electron.Rectangle) => {
-    // this.window.webContents.send('move-by-hand', newBounds);
-    this._sendGeometryDispatch(newBounds);
-  };
-
   private _willResizeListener = (event: Electron.Event, newBounds: Electron.Rectangle) => {
     // this.window.webContents.send('resize-by-hand', newBounds);
-    this._sendGeometryDispatch(newBounds);
+    // Update x, y, width, height
+    const action: AvatarSizeUpdateAction = {
+      type: 'avatar-size-update',
+      payload: {
+        url: this.url,
+        geometry: {
+          x: newBounds.x,
+          y: newBounds.y,
+          width: newBounds.width,
+          height: newBounds.height,
+        },
+      },
+    };
+    emitter.emit('persistent-store-dispatch', action);
   };
 
   private _closedListener = () => {

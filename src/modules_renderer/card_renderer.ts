@@ -11,6 +11,7 @@ import { CardCssStyle, ICardEditor } from '../modules_common/types_cardeditor';
 import { convertHexColorToRgba, darkenHexColor } from '../modules_common/color';
 import window from './window';
 import { getCtrlDown } from '../modules_common/keys';
+import { Avatar } from '../modules_common/schema_avatar';
 
 let cardCssStyle: CardCssStyle;
 let avatarProp: AvatarProp;
@@ -318,4 +319,50 @@ export const render = async (
       renderEditorRect();
     }
   }
+};
+
+const onResizeByHand = (newBounds: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}) => {
+  if (
+    avatarProp.geometry.x !== newBounds.x ||
+    avatarProp.geometry.y !== newBounds.y ||
+    avatarProp.geometry.width !== newBounds.width ||
+    avatarProp.geometry.height !== newBounds.height
+  ) {
+    avatarProp.geometry.x = Math.round(newBounds.x);
+    avatarProp.geometry.y = Math.round(newBounds.y);
+    avatarProp.geometry.width = Math.round(newBounds.width - getRenderOffsetWidth());
+    avatarProp.geometry.height = Math.round(newBounds.height - getRenderOffsetHeight());
+
+    render(['TitleBar', 'ContentsRect', 'EditorRect']);
+  }
+  //  queueSaveCommand();
+};
+
+const dispatch = (event: MessageEvent) => {
+  if (
+    event.source !== window ||
+    event.data.command === undefined ||
+    event.data.doc === undefined ||
+    event.data.command !== 'persistent-store-updated'
+  )
+    return;
+
+  const avatar = event.data.doc as Avatar;
+  /* TODO:
+   * Check differences
+   * This will be replaced by React Virtual DOM
+   */
+  onResizeByHand(avatar.geometry);
+  // onMoveByHand(avatar.geometry);
+};
+
+// Receive message from Main process via preload
+window.addEventListener('message', dispatch);
+const cleanup = () => {
+  window.removeEventListener('message', dispatch);
 };

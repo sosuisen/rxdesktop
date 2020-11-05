@@ -26,7 +26,7 @@ import { Workspace, workspaceSchema } from '../modules_common/schema_workspace';
 import { Card, cardSchema } from '../modules_common/schema_card';
 import { Avatar, avatarSchema, Geometry } from '../modules_common/schema_avatar';
 import { getDocs } from './store_utils';
-import { createAvatarWindows } from './avatar_window';
+import { avatarWindows, createAvatarWindows } from './avatar_window';
 import { PersistentStoreAction } from '../modules_common/store.types';
 import { emitter } from './event';
 
@@ -764,20 +764,51 @@ export const importJSON = async (filepath: string) => {
 
 const actionHandler = async (action: PersistentStoreAction) => {
   switch (action.type) {
-    case 'avatar-geometry-update': {
+    case 'avatar-position-update': {
       const url: string = action.payload.url;
       const geometry: Partial<Geometry> = action.payload.geometry;
       const docRx: RxDocument = await rxdb.avatar.findOne(url).exec();
       if (docRx) {
-        await docRx.atomicUpdate(oldDoc => {
+        const newDocRx = await docRx.atomicUpdate(oldDoc => {
           const avatar = (oldDoc as unknown) as Avatar;
           avatar.geometry.x = geometry.x ?? avatar.geometry.x;
           avatar.geometry.y = geometry.y ?? avatar.geometry.y;
-          avatar.geometry.z = geometry.z ?? avatar.geometry.z;
+          return avatar;
+        });
+        avatarWindows
+          .get(url)!
+          .window.webContents.send('persistent-store-updated', newDocRx.toJSON());
+      }
+      else {
+        console.error(`Error: ${url} does not exist in DB`);
+      }
+      break;
+    }
+    case 'avatar-size-update': {
+      const url: string = action.payload.url;
+      const geometry: Partial<Geometry> = action.payload.geometry;
+      const docRx: RxDocument = await rxdb.avatar.findOne(url).exec();
+      if (docRx) {
+        const avatar: Avatar = (docRx.toJSON() as unknown) as Avatar;
+        avatar.geometry.x = geometry.x ?? avatar.geometry.x;
+        avatar.geometry.y = geometry.y ?? avatar.geometry.y;
+        avatar.geometry.width = geometry.width ?? avatar.geometry.width;
+        avatar.geometry.height = geometry.height ?? avatar.geometry.height;
+
+        avatarWindows.get(url)!.window.webContents.send('persistent-store-updated', avatar);
+
+        const newDocRx = await docRx.atomicPatch(avatar);
+
+        /*
+        const newDocRx = await docRx.atomicUpdate(oldDoc => {
+          const avatar = (oldDoc as unknown) as Avatar;
+          avatar.geometry.x = geometry.x ?? avatar.geometry.x;
+          avatar.geometry.y = geometry.y ?? avatar.geometry.y;
           avatar.geometry.width = geometry.width ?? avatar.geometry.width;
           avatar.geometry.height = geometry.height ?? avatar.geometry.height;
           return avatar;
         });
+        */
       }
       else {
         console.error(`Error: ${url} does not exist in DB`);

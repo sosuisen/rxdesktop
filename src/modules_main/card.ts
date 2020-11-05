@@ -54,8 +54,6 @@ import {
   getCardProp,
   updateOrCreateCardData,
 } from './store';
-import { AvatarGeometryUpdateAction } from '../modules_common/store.types';
-import { Geometry } from '../modules_common/schema_avatar';
 
 /**
  * Card

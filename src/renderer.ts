@@ -45,11 +45,12 @@ import { getLocationFromUrl } from './modules_common/avatar_url_utils';
 import { getCurrentWorkspaceUrl } from './modules_main/store_workspaces';
 import { setAltDown, setCtrlDown, setMetaDown, setShiftDown } from './modules_common/keys';
 import { Card } from './modules_common/schema_card';
-import { Avatar } from './modules_common/schema_avatar';
+import { Avatar, Geometry } from './modules_common/schema_avatar';
+import { AvatarSizeUpdateAction } from './modules_common/store.types';
 
 let avatarProp: AvatarProp = new AvatarProp('');
 
-let avatarUrl: string;
+let avatarUrlEncoded: string;
 
 let cardCssStyle: CardCssStyle = {
   borderWidth: 0,
@@ -181,7 +182,7 @@ const initializeUIEvents = () => {
   let prevMouseY: number;
   let isHorizontalMoving = false;
   let isVerticalMoving = false;
-  const onMouseMove = async (event: MouseEvent) => {
+  const onMouseMove = (event: MouseEvent) => {
     let newWidth = avatarProp.geometry.width + getRenderOffsetWidth();
     let newHeight = avatarProp.geometry.height + getRenderOffsetHeight();
     if (isHorizontalMoving) {
@@ -194,13 +195,28 @@ const initializeUIEvents = () => {
     prevMouseY = event.screenY;
 
     if (isHorizontalMoving || isVerticalMoving) {
+      /*
       const rect: {
         x: number;
         y: number;
         width: number;
         height: number;
       } = await window.api.setWindowSize(avatarProp.url, newWidth, newHeight);
-      onResizeByHand(rect);
+      // onResizeByHand(rect);
+      */
+      const action: AvatarSizeUpdateAction = {
+        type: 'avatar-size-update',
+        payload: {
+          url: avatarProp.url,
+          geometry: {
+            x: avatarProp.geometry.x,
+            y: avatarProp.geometry.y,
+            width: newWidth,
+            height: newHeight,
+          },
+        },
+      };
+      window.api.persistentStoreDispatch(action);
     }
   };
   window.addEventListener('mousemove', onMouseMove);
@@ -294,8 +310,8 @@ const onload = async () => {
     const pair = arr[i].split('=');
     params[pair[0]] = pair[1];
   }
-  avatarUrl = params.avatarUrl;
-  if (!avatarUrl) {
+  avatarUrlEncoded = params.avatarUrl;
+  if (!avatarUrlEncoded) {
     console.error('id parameter is not given in URL');
     return;
   }
@@ -317,12 +333,13 @@ const onload = async () => {
 
   initializeContentsFrameEvents();
 
-  window.api.finishLoad(avatarUrl);
+  window.api.finishLoad(avatarUrlEncoded);
 };
 
 // eslint-disable-next-line complexity
 window.addEventListener('message', event => {
   if (event.source !== window || !event.data.command) return;
+
   switch (event.data.command) {
     case 'card-blurred':
       onCardBlurred();
@@ -337,13 +354,13 @@ window.addEventListener('message', event => {
       onChangeCardColor(event.data.backgroundColor, event.data.opacity);
       break;
     case 'move-by-hand':
-      onMoveByHand(event.data.bounds);
+      // onMoveByHand(event.data.bounds);
       break;
     case 'render-card':
       onRenderCard(event.data.card, event.data.avatar);
       break;
     case 'resize-by-hand':
-      onResizeByHand(event.data.bounds);
+      // onResizeByHand(event.data.bounds);
       break;
     case 'send-to-back':
       onSendToBack();
@@ -398,20 +415,6 @@ const onChangeCardColor = (backgroundColor: string, opacity = 1.0) => {
   render(['CardStyle', 'TitleBarStyle', 'EditorStyle']);
 };
 
-const onResizeByHand = (newBounds: {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}) => {
-  avatarProp.geometry.width = Math.round(newBounds.width - getRenderOffsetWidth());
-  avatarProp.geometry.height = Math.round(newBounds.height - getRenderOffsetHeight());
-
-  render(['TitleBar', 'ContentsRect', 'EditorRect']);
-
-  queueSaveCommand();
-};
-
 const onMoveByHand = (newBounds: {
   x: number;
   y: number;
@@ -421,7 +424,7 @@ const onMoveByHand = (newBounds: {
   avatarProp.geometry.x = Math.round(newBounds.x);
   avatarProp.geometry.y = Math.round(newBounds.y);
 
-  queueSaveCommand();
+  // queueSaveCommand();
 };
 
 // Render card data
