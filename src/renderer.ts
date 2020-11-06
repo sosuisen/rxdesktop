@@ -6,6 +6,8 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
+import { fromEvent } from 'rxjs';
+import { sampleTime } from 'rxjs/operators';
 import {
   AvatarProp,
   AvatarPropSerializable,
@@ -219,7 +221,11 @@ const initializeUIEvents = () => {
       window.api.persistentStoreDispatch(action);
     }
   };
-  window.addEventListener('mousemove', onMouseMove);
+
+  const mouseMoveSubscription = fromEvent(window, 'mousemove')
+    .pipe(sampleTime(500))
+    .subscribe(e => onMouseMove(e as MouseEvent));
+
   window.addEventListener('mouseup', event => {
     isHorizontalMoving = false;
     isVerticalMoving = false;
