@@ -167,23 +167,19 @@ const renderCardAndContentsRect = () => {
   document.getElementById('contents')!.style.height = contentsHeight + 'px';
 
   document.getElementById('resizeAreaRight')!.style.top = '0px';
-  document.getElementById('resizeAreaRight')!.style.left =
-    cardWidth - cardCssStyle.borderWidth + 'px';
+  document.getElementById('resizeAreaRight')!.style.left = cardWidth + 'px';
   document.getElementById('resizeAreaRight')!.style.width = shadowWidth + 'px';
   document.getElementById('resizeAreaRight')!.style.height =
     cardHeight + cardCssStyle.borderWidth + 'px';
 
-  document.getElementById('resizeAreaBottom')!.style.top =
-    cardHeight - cardCssStyle.borderWidth + 'px';
+  document.getElementById('resizeAreaBottom')!.style.top = cardHeight + 'px';
   document.getElementById('resizeAreaBottom')!.style.left = '0px';
   document.getElementById('resizeAreaBottom')!.style.width =
     cardWidth + cardCssStyle.borderWidth + 'px';
   document.getElementById('resizeAreaBottom')!.style.height = shadowHeight + 'px';
 
-  document.getElementById('resizeAreaRightBottom')!.style.top =
-    cardHeight - cardCssStyle.borderWidth + 'px';
-  document.getElementById('resizeAreaRightBottom')!.style.left =
-    cardWidth - cardCssStyle.borderWidth + 'px';
+  document.getElementById('resizeAreaRightBottom')!.style.top = cardHeight + 'px';
+  document.getElementById('resizeAreaRightBottom')!.style.left = cardWidth + 'px';
   document.getElementById('resizeAreaRightBottom')!.style.width = shadowWidth + 'px';
   document.getElementById('resizeAreaRightBottom')!.style.height = shadowHeight + 'px';
 };
