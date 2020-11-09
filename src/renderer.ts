@@ -7,7 +7,7 @@
  */
 
 import { fromEvent } from 'rxjs';
-import { sampleTime } from 'rxjs/operators';
+import { debounceTime } from 'rxjs/operators';
 import {
   AvatarProp,
   AvatarPropSerializable,
@@ -30,6 +30,7 @@ import {
   getRenderOffsetHeight,
   getRenderOffsetWidth,
   initCardRenderer,
+  onResizeByHand,
   render,
   shadowHeight,
   shadowWidth,
@@ -184,7 +185,23 @@ const initializeUIEvents = () => {
   let prevMouseY: number;
   let isHorizontalMoving = false;
   let isVerticalMoving = false;
-  const onMouseMove = (event: MouseEvent) => {
+  let lastRect: Omit<Geometry, 'z'>;
+  fromEvent(window, 'mousemove')
+    .pipe(debounceTime(1000))
+    .subscribe(event => {
+      if (lastRect === undefined) return;
+      const action: AvatarSizeUpdateAction = {
+        type: 'avatar-size-update',
+        payload: {
+          url: avatarProp.url,
+          geometry: lastRect,
+        },
+        skipTransfer: true,
+      };
+      window.api.persistentStoreDispatch(action);
+    });
+
+  window.addEventListener('mousemove', (event: MouseEvent) => {
     let newWidth = avatarProp.geometry.width + getRenderOffsetWidth();
     let newHeight = avatarProp.geometry.height + getRenderOffsetHeight();
     if (isHorizontalMoving) {
@@ -197,34 +214,15 @@ const initializeUIEvents = () => {
     prevMouseY = event.screenY;
 
     if (isHorizontalMoving || isVerticalMoving) {
-      /*
-      const rect: {
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-      } = await window.api.setWindowSize(avatarProp.url, newWidth, newHeight);
-      // onResizeByHand(rect);
-      */
-      const action: AvatarSizeUpdateAction = {
-        type: 'avatar-size-update',
-        payload: {
-          url: avatarProp.url,
-          geometry: {
-            x: avatarProp.geometry.x,
-            y: avatarProp.geometry.y,
-            width: newWidth,
-            height: newHeight,
-          },
-        },
+      lastRect = {
+        x: avatarProp.geometry.x,
+        y: avatarProp.geometry.y,
+        width: newWidth,
+        height: newHeight,
       };
-      window.api.persistentStoreDispatch(action);
+      onResizeByHand(lastRect);
     }
-  };
-
-  const mouseMoveSubscription = fromEvent(window, 'mousemove')
-    .pipe(sampleTime(500))
-    .subscribe(e => onMouseMove(e as MouseEvent));
+  });
 
   window.addEventListener('mouseup', event => {
     isHorizontalMoving = false;
@@ -338,7 +336,6 @@ const onload = async () => {
   );
 
   initializeContentsFrameEvents();
-
   window.api.finishLoad(avatarUrlEncoded);
 };
 
@@ -389,7 +386,7 @@ const onCardClose = () => {
   close();
 };
 
-const onCardFocused = async () => {
+const onCardFocused = () => {
   if (suppressFocusEvent) {
     return;
   }
@@ -397,22 +394,27 @@ const onCardFocused = async () => {
   avatarProp.status = 'Focused';
   render(['CardStyle', 'ContentsRect']);
 
+  /** 
   const newZ = await window.api.bringToFront(avatarProp.url);
   // eslint-disable-next-line require-atomic-updates
   avatarProp.geometry.z = newZ;
+
   saveCard(avatarProp);
+  */
 };
 
 const onCardBlurred = () => {
   avatarProp.status = 'Blurred';
   render(['CardStyle', 'ContentsRect']);
 
+  /*
   if (cardEditor.isOpened) {
     if (cardEditor.isCodeMode) {
       return;
     }
     endEditor();
   }
+  */
 };
 
 const onChangeCardColor = (backgroundColor: string, opacity = 1.0) => {

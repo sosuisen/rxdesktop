@@ -317,7 +317,7 @@ export const render = async (
   }
 };
 
-const onResizeByHand = (newBounds: {
+export const onResizeByHand = (newBounds: {
   x: number;
   y: number;
   width: number;
