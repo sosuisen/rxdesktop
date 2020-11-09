@@ -38,6 +38,10 @@ export type Avatar = {
   version: number;
 };
 
+export type AvatarWithSkipTransfer = {
+  skipTransfer: boolean;
+} & Avatar;
+
 // For RxDB
 export const avatarSchema = {
   title: 'Avatar Schema',

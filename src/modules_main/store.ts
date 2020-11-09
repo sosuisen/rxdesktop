@@ -24,10 +24,15 @@ import { getIdFromUrl } from '../modules_common/avatar_url_utils';
 import { getCurrentDateAndTime } from '../modules_common/utils';
 import { Workspace, workspaceSchema } from '../modules_common/schema_workspace';
 import { Card, cardSchema } from '../modules_common/schema_card';
-import { Avatar, avatarSchema, Geometry } from '../modules_common/schema_avatar';
+import {
+  Avatar,
+  avatarSchema,
+  AvatarWithSkipTransfer,
+  Geometry,
+} from '../modules_common/schema_avatar';
 import { getDocs } from './store_utils';
 import { avatarWindows, createAvatarWindows } from './avatar_window';
-import { PersistentStoreAction } from '../modules_common/store.types';
+import { PersistentStoreAction, RxDesktopAction } from '../modules_common/store.types';
 import { emitter } from './event';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -136,6 +141,27 @@ export const openDB = async () => {
 
     // Create all collections by one line
     await Promise.all(collections.map(collection => rxdb.collection(collection)));
+
+    /**
+     * Update of avatar must be atomic to enable 'skipTransfer'
+     */
+    let skipTransfer = false;
+    rxdb.avatar.preSave(
+      (plainData: { _rev: string } & AvatarWithSkipTransfer, rxDocument) => {
+        skipTransfer = plainData.skipTransfer;
+        delete plainData.skipTransfer;
+      },
+      false
+    );
+    rxdb.avatar.postSave((plainData: { _rev: string } & Avatar, rxDocument) => {
+      // skipTransfer is not changed from preSave to postSave
+      // when update is atomic
+      if (skipTransfer) {
+        // Skip to transfer this revision
+        const rev = plainData._rev;
+        console.log('skip: ' + rev + ',' + plainData.url);
+      }
+    }, false);
   } catch (e) {
     console.error(e);
     throw e;
@@ -762,6 +788,7 @@ export const importJSON = async (filepath: string) => {
   console.debug('Finished');
 };
 
+// eslint-disable-next-line complexity
 const actionHandler = async (action: PersistentStoreAction) => {
   switch (action.type) {
     case 'avatar-position-update': {
@@ -789,15 +816,17 @@ const actionHandler = async (action: PersistentStoreAction) => {
       const geometry: Partial<Geometry> = action.payload.geometry;
       const docRx: RxDocument = await rxdb.avatar.findOne(url).exec();
       if (docRx) {
-        const avatar: Avatar = (docRx.toJSON() as unknown) as Avatar;
+        const avatar: AvatarWithSkipTransfer = (docRx.toJSON() as unknown) as AvatarWithSkipTransfer;
         avatar.geometry.x = geometry.x ?? avatar.geometry.x;
         avatar.geometry.y = geometry.y ?? avatar.geometry.y;
         avatar.geometry.width = geometry.width ?? avatar.geometry.width;
         avatar.geometry.height = geometry.height ?? avatar.geometry.height;
 
-        avatarWindows.get(url)!.window.webContents.send('persistent-store-updated', avatar);
+        avatar.skipTransfer = action.skipTransfer ?? false;
 
-        const newDocRx = await docRx.atomicPatch(avatar);
+        await docRx.atomicPatch(avatar);
+
+        // avatarWindows.get(url)!.window.webContents.send('persistent-store-updated', avatar);
 
         /*
         const newDocRx = await docRx.atomicUpdate(oldDoc => {
