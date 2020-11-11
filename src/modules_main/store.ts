@@ -143,25 +143,48 @@ export const openDB = async () => {
     await Promise.all(collections.map(collection => rxdb.collection(collection)));
 
     /**
+     * Avatar subscription
+     */
+    const skipTransferSet = new Set();
+    const generateSkipTransferKey = (url: string, revision: string) => {
+      return url + '_' + revision;
+    };
+    const transferMustBeSkipped = (changeEvent: RxChangeEventUpdate<any>) => {
+      if (
+        skipTransferSet.has(
+          generateSkipTransferKey(
+            changeEvent.previousData.url,
+            changeEvent.previousData._rev
+          )
+        )
+      ) {
+        return true;
+      }
+      return false;
+    };
+    rxdb.avatar.update$.subscribe(changeEvent => {
+      if (!transferMustBeSkipped(changeEvent)) {
+        const avatar: Avatar = (changeEvent.documentData as unknown) as Avatar;
+        console.debug('Transfer updated store to Renderer: ' + avatar.url);
+        avatarWindows
+          .get(avatar.url)!
+          .window.webContents.send('persistent-store-updated', null, avatar);
+      }
+    });
+
+    /**
      * Update of avatar must be atomic to enable 'skipTransfer'
      */
-    let skipTransfer = false;
     rxdb.avatar.preSave(
       (plainData: { _rev: string } & AvatarWithSkipTransfer, rxDocument) => {
-        skipTransfer = plainData.skipTransfer;
+        // console.debug('preSave: ' + plainData._rev + ',' + plainData.url);
+        if (plainData.skipTransfer) {
+          skipTransferSet.add(generateSkipTransferKey(plainData.url, plainData._rev));
+        }
         delete plainData.skipTransfer;
       },
       false
     );
-    rxdb.avatar.postSave((plainData: { _rev: string } & Avatar, rxDocument) => {
-      // skipTransfer is not changed from preSave to postSave
-      // when update is atomic
-      if (skipTransfer) {
-        // Skip to transfer this revision
-        const rev = plainData._rev;
-        console.log('skip: ' + rev + ',' + plainData.url);
-      }
-    }, false);
   } catch (e) {
     console.error(e);
     throw e;
@@ -282,29 +305,25 @@ export const loadCurrentWorkspace = async () => {
 
   //  console.dir(cards, { depth: null });
 
-  createAvatarWindows(cardMap, avatars);
+  await createAvatarWindows(cardMap, avatars);
 
   // TODO: Arrange avatars
-  /*
-  const backToFront = [...avatars.keys()].sort((a, b) => {
-    if (avatars.get(a)!.prop.geometry.z < avatars.get(b)!.prop.geometry.z) {
+  const backToFront = avatars.sort((a, b) => {
+    if (a.geometry.z < b.geometry.z) {
       return -1;
     }
-    else if (avatars.get(a)!.prop.geometry.z > avatars.get(b)!.prop.geometry.z) {
+    else if (a.geometry.z > b.geometry.z) {
       return 1;
     }
     return 0;
   });
 
-  for (const key of backToFront) {
-    const avatar = avatars.get(key);
-    if (avatar) {
-      if (!avatar.window.isDestroyed()) {
-        avatar.window.moveTop();
-      }
+  backToFront.forEach(avatar => {
+    const avatarWin = avatarWindows.get(avatar.url);
+    if (avatarWin && !avatarWin.window.isDestroyed()) {
+      avatarWin.window.moveTop();
     }
-  }
-  */
+  });
 
   console.debug(`Completed to load ${avatars.length} cards`);
 
@@ -823,21 +842,8 @@ const actionHandler = async (action: PersistentStoreAction) => {
         avatar.geometry.height = geometry.height ?? avatar.geometry.height;
 
         avatar.skipTransfer = action.skipTransfer ?? false;
-
-        await docRx.atomicPatch(avatar);
-
-        // avatarWindows.get(url)!.window.webContents.send('persistent-store-updated', avatar);
-
-        /*
-        const newDocRx = await docRx.atomicUpdate(oldDoc => {
-          const avatar = (oldDoc as unknown) as Avatar;
-          avatar.geometry.x = geometry.x ?? avatar.geometry.x;
-          avatar.geometry.y = geometry.y ?? avatar.geometry.y;
-          avatar.geometry.width = geometry.width ?? avatar.geometry.width;
-          avatar.geometry.height = geometry.height ?? avatar.geometry.height;
-          return avatar;
-        });
-        */
+        console.debug('avatar-size-update from renderer');
+        await docRx.atomicPatch(avatar).catch(e => console.error(e));
       }
       else {
         console.error(`Error: ${url} does not exist in DB`);
@@ -851,7 +857,9 @@ const actionHandler = async (action: PersistentStoreAction) => {
 
 ipcMain.handle(
   'persistent-store-dispatch',
-  async (event: any, action: PersistentStoreAction) => await actionHandler(action)
+  async (event: any, action: PersistentStoreAction) => {
+    await actionHandler(action).catch(e => console.debug(e));
+  }
 ); // from renderer
 emitter.on(
   'persistent-store-dispatch',

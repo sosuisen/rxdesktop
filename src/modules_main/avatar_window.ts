@@ -18,6 +18,7 @@ import {
   shell,
 } from 'electron';
 import contextMenu from 'electron-context-menu';
+import { DebounceQueue } from 'rx-queue';
 import { DialogButton } from '../modules_common/const';
 import { getSettings, globalDispatch, MESSAGE } from './store_settings';
 import { getIdFromUrl } from '../modules_common/avatar_url_utils';
@@ -283,6 +284,8 @@ export class AvatarWindow {
 
   public resetContextMenu: Function;
 
+  private _debouncedResizeQueue = new DebounceQueue(1000);
+
   constructor (_url: string) {
     this.url = _url;
     this.indexUrl = url.format({
@@ -467,6 +470,24 @@ export class AvatarWindow {
         event.preventDefault();
       }
     });
+
+    this._debouncedResizeQueue.subscribe(rect => {
+      console.debug('Save geometry from will-resize event on main');
+      const action: AvatarSizeUpdateAction = {
+        type: 'avatar-size-update',
+        payload: {
+          url: this.url,
+          geometry: {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+          },
+        },
+        skipTransfer: true,
+      };
+      emitter.emit('persistent-store-dispatch', action);
+    });
   }
 
   private _willMoveListener = (event: Electron.Event, newBounds: Electron.Rectangle) => {
@@ -486,21 +507,12 @@ export class AvatarWindow {
   };
 
   private _willResizeListener = (event: Electron.Event, newBounds: Electron.Rectangle) => {
-    // this.window.webContents.send('resize-by-hand', newBounds);
     // Update x, y, width, height
-    const action: AvatarSizeUpdateAction = {
-      type: 'avatar-size-update',
-      payload: {
-        url: this.url,
-        geometry: {
-          x: newBounds.x,
-          y: newBounds.y,
-          width: newBounds.width,
-          height: newBounds.height,
-        },
-      },
-    };
-    emitter.emit('persistent-store-dispatch', action);
+    this._debouncedResizeQueue.next(newBounds);
+    console.debug('Transfer geometry from will-resize event on main');
+    avatarWindows
+      .get(this.url)!
+      .window.webContents.send('persistent-store-updated', 'geometry', newBounds);
   };
 
   private _closedListener = () => {
@@ -521,7 +533,6 @@ export class AvatarWindow {
 
   // @ts-ignore
   private _focusListener = e => {
-    /*
     if (this.recaptureGlobalFocusEventAfterLocalFocusEvent) {
       this.recaptureGlobalFocusEventAfterLocalFocusEvent = false;
       setGlobalFocusEventListenerPermission(true);
@@ -537,11 +548,9 @@ export class AvatarWindow {
       console.debug(`focus ${this.url}`);
       this.window.webContents.send('card-focused');
     }
-    */
   };
 
   private _blurListener = () => {
-    /*
     if (this.suppressBlurEventOnce) {
       console.debug(`skip blur event listener ${this.url}`);
       this.suppressBlurEventOnce = false;
@@ -550,7 +559,6 @@ export class AvatarWindow {
       console.debug(`blur ${this.url}`);
       this.window.webContents.send('card-blurred');
     }
-    */
   };
 
   public removeWindowListeners = () => {

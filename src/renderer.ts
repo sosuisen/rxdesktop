@@ -8,6 +8,7 @@
 
 import { fromEvent } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
+import { DebounceQueue } from 'rx-queue';
 import {
   AvatarProp,
   AvatarPropSerializable,
@@ -185,21 +186,18 @@ const initializeUIEvents = () => {
   let prevMouseY: number;
   let isHorizontalMoving = false;
   let isVerticalMoving = false;
-  let lastRect: Omit<Geometry, 'z'>;
-  fromEvent(window, 'mousemove')
-    .pipe(debounceTime(1000))
-    .subscribe(event => {
-      if (lastRect === undefined) return;
-      const action: AvatarSizeUpdateAction = {
-        type: 'avatar-size-update',
-        payload: {
-          url: avatarProp.url,
-          geometry: lastRect,
-        },
-        skipTransfer: true,
-      };
-      window.api.persistentStoreDispatch(action);
-    });
+  const debouncedResizeQueue = new DebounceQueue(1000);
+  debouncedResizeQueue.subscribe(rect => {
+    const action: AvatarSizeUpdateAction = {
+      type: 'avatar-size-update',
+      payload: {
+        url: avatarProp.url,
+        geometry: rect,
+      },
+      skipTransfer: true,
+    };
+    window.api.persistentStoreDispatch(action);
+  });
 
   window.addEventListener('mousemove', (event: MouseEvent) => {
     let newWidth = avatarProp.geometry.width + getRenderOffsetWidth();
@@ -214,13 +212,15 @@ const initializeUIEvents = () => {
     prevMouseY = event.screenY;
 
     if (isHorizontalMoving || isVerticalMoving) {
-      lastRect = {
+      const rect = {
         x: avatarProp.geometry.x,
         y: avatarProp.geometry.y,
         width: newWidth,
         height: newHeight,
       };
-      onResizeByHand(lastRect);
+      debouncedResizeQueue.next(rect);
+      window.resizeTo(newWidth, newHeight);
+      onResizeByHand(rect);
     }
   });
 

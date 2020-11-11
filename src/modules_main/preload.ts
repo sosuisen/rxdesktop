@@ -128,6 +128,6 @@ ipcRenderer.on('zoom-out', () => window.postMessage({ command: 'zoom-out' }, 'fi
 /**
  * Store Actions
  */
-ipcRenderer.on('persistent-store-updated', (event, doc) => {
-  window.postMessage({ command: 'persistent-store-updated', doc }, 'file://');
+ipcRenderer.on('persistent-store-updated', (event, propertyName, doc) => {
+  window.postMessage({ command: 'persistent-store-updated', propertyName, doc }, 'file://');
 });
