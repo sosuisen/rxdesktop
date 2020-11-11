@@ -34,6 +34,7 @@ import { getDocs } from './store_utils';
 import { avatarWindows, createAvatarWindows } from './avatar_window';
 import { PersistentStoreAction, RxDesktopAction } from '../modules_common/store.types';
 import { emitter } from './event';
+import { RxChangeEventUpdate } from 'rxdb/dist/types/rx-change-event';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 addRxPlugin(require('pouchdb-adapter-leveldb'));
