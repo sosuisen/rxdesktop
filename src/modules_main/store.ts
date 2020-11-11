@@ -18,6 +18,7 @@ import {
 } from 'rxdb';
 import leveldown from 'leveldown';
 import { ipcMain } from 'electron';
+import { RxChangeEventUpdate } from 'rxdb/dist/types/rx-change-event';
 import { CardProp } from '../modules_common/cardprop';
 import { getSettings, MESSAGE } from './store_settings';
 import { getIdFromUrl } from '../modules_common/avatar_url_utils';
@@ -34,7 +35,6 @@ import { getDocs } from './store_utils';
 import { avatarWindows, createAvatarWindows } from './avatar_window';
 import { PersistentStoreAction, RxDesktopAction } from '../modules_common/store.types';
 import { emitter } from './event';
-import { RxChangeEventUpdate } from 'rxdb/dist/types/rx-change-event';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 addRxPlugin(require('pouchdb-adapter-leveldb'));
