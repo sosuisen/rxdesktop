@@ -187,10 +187,10 @@ const initializeUIEvents = () => {
   const debouncedResizeQueue = new DebounceQueue(1000);
   debouncedResizeQueue.subscribe(rect => {
     const action = avatarSizeUpdateActionCreator(avatarProp.url, rect, true);
-    window.api.persistentStoreDispatch(action);
+    window.api.persistentStoreDispatcher(action);
   });
 
-  window.addEventListener('mousemove', (event: MouseEvent) => {
+  const onmousemove = (event: MouseEvent) => {
     let newWidth = avatarProp.geometry.width + getRenderOffsetWidth();
     let newHeight = avatarProp.geometry.height + getRenderOffsetHeight();
     if (isHorizontalMoving) {
@@ -213,7 +213,8 @@ const initializeUIEvents = () => {
       window.resizeTo(newWidth, newHeight);
       onResizeByHand(rect);
     }
-  });
+  };
+  window.addEventListener('mousemove', onmousemove);
 
   window.addEventListener('mouseup', event => {
     isHorizontalMoving = false;

@@ -1,0 +1,73 @@
+' PlantUML
+@startuml
+title Store and Action flows in RxDesktop
+
+skinparam activity {
+  BackgroundColor #e0ffff
+  BorderColor #609090
+}
+
+
+partition MainProcess {
+    "_willResizeListener/_willMoveListener" -down-> ===B1===
+
+    partition "Serialize to DB" {
+        ===B1=== --> [rect] "_debouncedAvatarSizeUpdateActionQueue"
+        "_debouncedAvatarSizeUpdateActionQueue" --> [debounce 1000ms] "persistentStoreActionDispatcher(action)"
+        note bottom 
+            skipForward is set to true
+        end note    
+        "persistentStoreActionDispatcher(action)" --> [action] "storeUpdater(action)"
+        "storeUpdater(action)" --> [action] "avatarUpdater(action, reducer(avatar))"
+    }
+    partition "Forward to Renderer" {
+        ===B1=== --> [{ state: rect,                         \n propertyName: 'geometry' }] "persistentStoreForwarder"
+        if "skipForward flag?" then
+            -->[true] (*)
+        else
+            -->[false] "window.webContents.send"
+        endif
+        "window.webContents.send" --> ['persistent-store-forward' event\n with updated state] "preload\n ipcRenderer-postMessage bridge"
+    }
+    "Subscription" -down-> [{ state: avatar,\n revision }] "persistentStoreForwarder"    
+    "loadCurrentWorkspace()" -up-> ['render-card' event with card and avatar] "preload\n ipcRenderer-postMessage bridge" 
+
+}
+
+partition RxDB {
+    "avatarUpdater(action, reducer(avatar))" --> [new avatar] "start atomicPatch"    
+    "start atomicPatch" -left-> [new avatar] "preSave hook"
+    if "skipForward?" then 
+        -left-> [true] "set skipForward flag"
+        -right-> "Save"
+    else 
+        --> [false] "Save"
+    "Save" -up-> "Avatar Observable"        
+
+    "Subscription" -up-> [subscribe] "Avatar Observable"
+    "Avatar Observable" --> [update event with avatar] "Subscription"
+}            
+
+partition RendererProcess {
+    "preload\n ipcRenderer-postMessage bridge" --> "Update HTML Components"
+    "onmousemove" --> ===B2===
+     --> [rect] "Update HTML Components"
+    ===B2=== --> [rect] "debouncedResizeQueue"
+    "debouncedResizeQueue" --> [debounce 1000ms] "persistentStoreDispatcher(action)"
+    note bottom 
+      skipForward is set to true
+    end note    
+    "persistentStoreDispatcher(action)" --> [action] "storeUpdater(action)" 
+}
+
+"User Mouse Dragging\n Dragging title bar to move window\n Dragging edges to resize window" --> ['will-resize' or 'will-move' event] "_willResizeListener/_willMoveListener"
+note top
+    Window position and size
+    are changed immediately
+    by mouse dragging.
+end note
+
+"User Mouse Dragging\n Dragging title bar to move window\n Dragging edges to resize window" -left-> ['mousemove' event on resizeArea] "onmousemove"
+note top
+    Window size has not been changed yet.
+end note
