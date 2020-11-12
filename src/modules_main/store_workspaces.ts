@@ -57,7 +57,9 @@ export const removeAvatarFromWorkspace = (workspaceId: string, avatarUrl: string
 };
 
 export const getNextWorkspaceId = () => {
-  const idArray = [...workspaces.keys()].map(id => parseInt(id, 0)).sort();
+  // Notice: Don't use sort() because it sorts members alphabetically.
+  const idArray = [...workspaces.keys()].map(id => parseInt(id, 0)).sort((a, b) => a - b);
+
   let lastId = idArray[idArray.length - 1];
   return `${++lastId}`;
 };

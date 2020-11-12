@@ -99,7 +99,7 @@ export const setTrayContextMenu = () => {
     return;
   }
   const changeWorkspaces: MenuItemConstructorOptions[] = [...workspaces.keys()]
-    .sort()
+    .sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
     .map(id => {
       return {
         label: `${workspaces.get(id)?.name}`,
