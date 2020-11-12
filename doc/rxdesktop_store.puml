@@ -29,7 +29,7 @@ partition MainProcess {
         endif
         "window.webContents.send" --> ['reactive-forward' event\n with updated state] "preload\n ipcRenderer-postMessage bridge"
     }
-    "Subscription" -down-> [{ state: avatar,\n revision }] "reactiveForwarder"    
+    "Subscription" -right-> [{ state: avatar,\n revision }] "reactiveForwarder"    
     "loadCurrentWorkspace()" -up-> ['render-card' event with card and avatar] "preload\n ipcRenderer-postMessage bridge" 
 
 }
@@ -44,7 +44,7 @@ partition RxDB {
         --> [false] "Save"
     "Save" -up-> "Avatar Observable"        
 
-    "Subscription" -up-> [subscribe] "Avatar Observable"
+    "Subscription" --> [subscribe] "Avatar Observable"
     "Avatar Observable" --> [update event with avatar] "Subscription"
 }            
 
