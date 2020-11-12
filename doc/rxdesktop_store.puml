@@ -3,15 +3,15 @@
 title DB & Presentation Update Flow
 
 skinparam activity {
-  BackgroundColor #e0ffff
+  BackgroundColor #ffffff
   BorderColor #609090
 }
 
 
-partition MainProcess {
+partition "Main Process" {
     "_willResizeListener/_willMoveListener" -down-> ===B1===
 
-    partition "Database Update" {
+    partition "Database Update" #fff0e0 {
         ===B1=== --> [rect] "_debouncedAvatarSizeUpdateActionQueue"
         "_debouncedAvatarSizeUpdateActionQueue" --> [debounce 1000ms] "persistentStoreActionDispatcher(action)"
         note bottom 
@@ -20,54 +20,71 @@ partition MainProcess {
         "persistentStoreActionDispatcher(action)" --> [action] "storeUpdater(action)"
         "storeUpdater(action)" --> [action] "avatarUpdater(action, reducer(avatar))"
     }
-    partition "Reactive Presentation Update\n(Forward to Renderer)" {
+    partition "Reactive Presentation Update\n(Forward to Renderer)" #e0ffe0 {
         ===B1=== --> [{ state: rect,                         \n propertyName: 'geometry' }] "reactiveForwarder"
         if "skipForward flag?" then
-            -->[true] (*)
+            -->[true] "Abort" #ffff00 
         else
             -->[false] "window.webContents.send"
         endif
-        "window.webContents.send" --> ['reactive-forward' event\n with updated state] "preload\n ipcRenderer-postMessage bridge"
+        "window.webContents.send" --> ['reactive-forward' event\n with updated state] "(preload)\n ipcRenderer - postMessage bridge"
     }
-    "Subscription" -right-> [{ state: avatar,\n revision }] "reactiveForwarder"    
-    "loadCurrentWorkspace()" -up-> ['render-card' event with card and avatar] "preload\n ipcRenderer-postMessage bridge" 
+    "Observer" #e0ffe0 -right-> [{ state: avatar,\n revision }] "reactiveForwarder"    
+    "loadCurrentWorkspace()" -up-> ['render-card' event with card and avatar] "(preload)\n ipcRenderer - postMessage bridge" 
 
 }
 
-partition RxDB {
+partition RxDB  #fff0e0 {
     "avatarUpdater(action, reducer(avatar))" --> [new avatar] "start atomicPatch"    
     "start atomicPatch" -left-> [new avatar] "preSave hook"
-    if "skipForward?" then 
-        -left-> [true] "set skipForward flag"
+    if "skipForward?" then
+        --> [true] "set skipForward flag" #ffff00 
         -right-> "Save"
     else 
         --> [false] "Save"
-    "Save" -up-> "Avatar Observable"        
+    "Save" -down-> "Observable Avatar"
 
-    "Subscription" --> [subscribe] "Avatar Observable"
-    "Avatar Observable" --> [update event with avatar] "Subscription"
+    "Observer" --> [subscribe] "Observable Avatar" 
+    "Observable Avatar" #e0ffe0 --> [update event\n with new avatar] "Observer"
 }            
 
-partition RendererProcess {
-    "preload\n ipcRenderer-postMessage bridge" --> "Update HTML Components"
-    "onmousemove" --> ===B2===
-     --> [rect] "Update HTML Components"
-    ===B2=== --> [rect] "debouncedResizeQueue"
-    "debouncedResizeQueue" --> [debounce 1000ms] "persistentStoreDispatcher(action)"
-    note bottom 
-      skipForward is set to true
-    end note    
-    "persistentStoreDispatcher(action)" --> [action] "storeUpdater(action)" 
+partition "GitHub Plugin" #fff0e0 {
+    "new commit" -right-> "syncTo"
+    note top
+        skipForward is set to false
+        (default)
+    end note
+    "syncTo" --> "start atomicPatch"
+    "Observable Avatar" -up-> [update event\n with new avatar] "Observer(GitHub)" #e0ffe0
+    "Observer(GitHub)" -right-> [subscribe] "Observable Avatar"
+    "Observer(GitHub)" -left-> "new commit"
 }
 
-"User Mouse Dragging\n Dragging title bar to move window\n Dragging edges to resize window" --> ['will-resize' or 'will-move' event] "_willResizeListener/_willMoveListener"
+partition "Renderer Process" {
+    "onmousemove" --> ===B2===        
+    partition "Reactive Presentation Update" #e0ffe0 {    
+        "(preload)\n ipcRenderer - postMessage bridge" --> "Update HTML Components"
+        ===B2=== --> [rect] "Update HTML Components"
+    }
+    partition "Database Update\n(Forward to Main)" #fff0e0 {
+    ===B2=== --> [rect] "debouncedResizeQueue"
+        "debouncedResizeQueue" --> [debounce 1000ms] "persistentStoreDispatcher(action)"
+        note bottom 
+          skipForward is set to true
+        end note    
+        "persistentStoreDispatcher(action)" -right-> [action] "storeUpdater(action)"     
+    }
+}
+
+"User Mouse Dragging\n Dragging title bar to move window\n Dragging edges to resize window" #ffc0c0 --> ===B0===
+--> ['will-resize' or 'will-move' event] "_willResizeListener/_willMoveListener"
 note top
     Window position and size
     are changed immediately
     by mouse dragging.
 end note
 
-"User Mouse Dragging\n Dragging title bar to move window\n Dragging edges to resize window" -left-> ['mousemove' event on resizeArea] "onmousemove"
+===B0=== -left-> ['mousemove' event on resizeArea] "onmousemove"
 note top
     Window size has not been changed yet.
 end note
