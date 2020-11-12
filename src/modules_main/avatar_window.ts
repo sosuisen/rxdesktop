@@ -495,7 +495,7 @@ export class AvatarWindow {
   };
 
   // Forward changes on persistent store to Renderer process
-  public persistentStoreForwarder = (props: {
+  public reactiveForwarder = (props: {
     propertyName?: keyof Avatar;
     state: any;
     revision?: string;
@@ -507,23 +507,19 @@ export class AvatarWindow {
       return;
     }
     console.debug(`Forward: ${props.propertyName || 'all properties'} to ${this.url}`);
-    this.window.webContents.send(
-      'persistent-store-forward',
-      props.propertyName,
-      props.state
-    );
+    this.window.webContents.send('reactive-forward', props.propertyName, props.state);
   };
 
   private _willMoveListener = (event: Electron.Event, rect: Electron.Rectangle) => {
     // Update x and y
     this._debouncedAvatarPositionUpdateActionQueue.next(rect);
-    this.persistentStoreForwarder({ propertyName: 'geometry', state: rect });
+    this.reactiveForwarder({ propertyName: 'geometry', state: rect });
   };
 
   private _willResizeListener = (event: Electron.Event, rect: Electron.Rectangle) => {
     // Update x, y, width, height
     this._debouncedAvatarSizeUpdateActionQueue.next(rect);
-    this.persistentStoreForwarder({ propertyName: 'geometry', state: rect });
+    this.reactiveForwarder({ propertyName: 'geometry', state: rect });
   };
 
   private _closedListener = () => {

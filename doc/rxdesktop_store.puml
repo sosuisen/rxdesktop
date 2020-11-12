@@ -1,6 +1,6 @@
 ' PlantUML
 @startuml
-title Store and Action flows in RxDesktop
+title DB & Presentation Update Flow
 
 skinparam activity {
   BackgroundColor #e0ffff
@@ -11,7 +11,7 @@ skinparam activity {
 partition MainProcess {
     "_willResizeListener/_willMoveListener" -down-> ===B1===
 
-    partition "Serialize to DB" {
+    partition "Database Update" {
         ===B1=== --> [rect] "_debouncedAvatarSizeUpdateActionQueue"
         "_debouncedAvatarSizeUpdateActionQueue" --> [debounce 1000ms] "persistentStoreActionDispatcher(action)"
         note bottom 
@@ -20,16 +20,16 @@ partition MainProcess {
         "persistentStoreActionDispatcher(action)" --> [action] "storeUpdater(action)"
         "storeUpdater(action)" --> [action] "avatarUpdater(action, reducer(avatar))"
     }
-    partition "Forward to Renderer" {
-        ===B1=== --> [{ state: rect,                         \n propertyName: 'geometry' }] "persistentStoreForwarder"
+    partition "Reactive Presentation Update\n(Forward to Renderer)" {
+        ===B1=== --> [{ state: rect,                         \n propertyName: 'geometry' }] "reactiveForwarder"
         if "skipForward flag?" then
             -->[true] (*)
         else
             -->[false] "window.webContents.send"
         endif
-        "window.webContents.send" --> ['persistent-store-forward' event\n with updated state] "preload\n ipcRenderer-postMessage bridge"
+        "window.webContents.send" --> ['reactive-forward' event\n with updated state] "preload\n ipcRenderer-postMessage bridge"
     }
-    "Subscription" -down-> [{ state: avatar,\n revision }] "persistentStoreForwarder"    
+    "Subscription" -down-> [{ state: avatar,\n revision }] "reactiveForwarder"    
     "loadCurrentWorkspace()" -up-> ['render-card' event with card and avatar] "preload\n ipcRenderer-postMessage bridge" 
 
 }

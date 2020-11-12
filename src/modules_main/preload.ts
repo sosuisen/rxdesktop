@@ -128,6 +128,6 @@ ipcRenderer.on('zoom-out', () => window.postMessage({ command: 'zoom-out' }, 'fi
 /**
  * Store Actions
  */
-ipcRenderer.on('persistent-store-forward', (event, propertyName, doc) => {
-  window.postMessage({ command: 'persistent-store-forward', propertyName, doc }, 'file://');
+ipcRenderer.on('reactive-forward', (event, propertyName, doc) => {
+  window.postMessage({ command: 'reactive-forward', propertyName, doc }, 'file://');
 });

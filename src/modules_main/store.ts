@@ -152,7 +152,7 @@ export const openDB = async () => {
      */
     rxdb.avatar.update$.subscribe(changeEvent => {
       const avatar: Avatar = (changeEvent.documentData as unknown) as Avatar;
-      avatarWindows.get(avatar.url)!.persistentStoreForwarder({
+      avatarWindows.get(avatar.url)!.reactiveForwarder({
         state: avatar,
         revision: changeEvent.previousData._rev,
       });
@@ -191,7 +191,7 @@ export const prepareDbSync = () => {
     // insert, update, delete
     if (changeEvent.operation === 'INSERT') {
       const payload = changeEvent.documentData;
-      mainWindow.webContents.send('persistent-store-forward', payload);
+      mainWindow.webContents.send('reactive-forward', payload);
     }
     else if (changeEvent.operation === 'DELETE') {
       mainWindow.webContents.send(
