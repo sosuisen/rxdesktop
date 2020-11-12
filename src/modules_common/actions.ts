@@ -31,6 +31,22 @@ export interface AvatarSizeUpdateAction extends RxDesktopAction {
 
 export type PersistentStoreAction = AvatarPositionUpdateAction | AvatarSizeUpdateAction;
 
+export const avatarPositionUpdateActionCreator = (
+  url: string,
+  geometry: Geometry2D,
+  skipForward?: boolean
+) => {
+  const action: AvatarPositionUpdateAction = {
+    type: 'avatar-position-update',
+    payload: {
+      url,
+      geometry,
+    },
+    skipForward: skipForward ?? false,
+  };
+  return action;
+};
+
 export const avatarSizeUpdateActionCreator = (
   url: string,
   geometry: Geometry2D,

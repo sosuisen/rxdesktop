@@ -350,6 +350,7 @@ export const onResizeByHand = (newBounds: {
   //  queueSaveCommand();
 };
 
+// eslint-disable-next-line complexity
 const dispatch = (event: MessageEvent) => {
   if (
     event.source !== window ||
@@ -367,10 +368,22 @@ const dispatch = (event: MessageEvent) => {
     const avatar = event.data.doc as Avatar;
     onResizeByHand(avatar.geometry);
     // onMoveByHand(avatar.geometry);
+    /**
+     * TODO: set updated state to avatarProp
+     */
   }
   else if (event.data.propertyName === 'geometry') {
     const geometry = event.data.doc as Geometry;
-    onResizeByHand(geometry);
+    if (
+      avatarProp.geometry.width !== geometry.width ||
+      avatarProp.geometry.height !== geometry.height
+    ) {
+      onResizeByHand(geometry);
+    }
+    else if (avatarProp.geometry.x !== geometry.x || avatarProp.geometry.y !== geometry.y) {
+      avatarProp.geometry.x = geometry.x;
+      avatarProp.geometry.y = geometry.y;
+    }
   }
 };
 

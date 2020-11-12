@@ -30,6 +30,7 @@ import { Card } from '../modules_common/schema_card';
 import { AvatarUrl } from '../modules_common/schema_workspace';
 import {
   AvatarPositionUpdateAction,
+  avatarPositionUpdateActionCreator,
   avatarSizeUpdateActionCreator,
   PersistentStoreAction,
 } from '../modules_common/actions';
@@ -289,6 +290,7 @@ export class AvatarWindow {
 
   public resetContextMenu: Function;
 
+  private _debouncedAvatarPositionUpdateActionQueue = new DebounceQueue(1000);
   private _debouncedAvatarSizeUpdateActionQueue = new DebounceQueue(1000);
 
   constructor (_url: string) {
@@ -476,27 +478,15 @@ export class AvatarWindow {
       }
     });
 
+    this._debouncedAvatarPositionUpdateActionQueue.subscribe(rect => {
+      const action = avatarPositionUpdateActionCreator(this.url, rect, true);
+      persistentStoreActionDispatcher(action);
+    });
     this._debouncedAvatarSizeUpdateActionQueue.subscribe(rect => {
       const action = avatarSizeUpdateActionCreator(this.url, rect, true);
       persistentStoreActionDispatcher(action);
     });
   }
-
-  private _willMoveListener = (event: Electron.Event, newBounds: Electron.Rectangle) => {
-    // this.window.webContents.send('move-by-hand', newBounds);
-    // update x and y
-    const action: AvatarPositionUpdateAction = {
-      type: 'avatar-position-update',
-      payload: {
-        url: this.url,
-        geometry: {
-          x: newBounds.x,
-          y: newBounds.y,
-        },
-      },
-    };
-    emitter.emit('persistent-store-dispatch', action);
-  };
 
   private _skipForwardRevisions = new Set();
   public skipForward = (revision: string) => {
@@ -522,6 +512,12 @@ export class AvatarWindow {
       props.propertyName,
       props.state
     );
+  };
+
+  private _willMoveListener = (event: Electron.Event, rect: Electron.Rectangle) => {
+    // Update x and y
+    this._debouncedAvatarPositionUpdateActionQueue.next(rect);
+    this.persistentStoreForwarder({ propertyName: 'geometry', state: rect });
   };
 
   private _willResizeListener = (event: Electron.Event, rect: Electron.Rectangle) => {
