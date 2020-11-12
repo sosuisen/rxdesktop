@@ -6,7 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-import url from 'url';
+import nodeUrl from 'url';
 import path from 'path';
 
 import {
@@ -25,13 +25,14 @@ import { getIdFromUrl } from '../modules_common/avatar_url_utils';
 import { emitter, handlers } from './event';
 import { cardColors, ColorName } from '../modules_common/color';
 import { getCurrentWorkspaceId, workspaces } from './store_workspaces';
-import { Avatar, Geometry } from '../modules_common/schema_avatar';
+import { Avatar } from '../modules_common/schema_avatar';
 import { Card } from '../modules_common/schema_card';
 import { AvatarUrl } from '../modules_common/schema_workspace';
 import {
   AvatarPositionUpdateAction,
-  AvatarSizeUpdateAction,
-} from '../modules_common/store.types';
+  avatarSizeUpdateActionCreator,
+  PersistentStoreAction,
+} from '../modules_common/actions';
 
 /**
  * Const
@@ -271,6 +272,10 @@ const setContextMenu = (win: BrowserWindow) => {
   return resetContextMenu;
 };
 
+const persistentStoreActionDispatcher = (action: PersistentStoreAction) => {
+  emitter.emit('persistent-store-dispatch', action);
+};
+
 export class AvatarWindow {
   public url: string;
   public window: BrowserWindow;
@@ -284,11 +289,11 @@ export class AvatarWindow {
 
   public resetContextMenu: Function;
 
-  private _debouncedResizeQueue = new DebounceQueue(1000);
+  private _debouncedAvatarSizeUpdateActionQueue = new DebounceQueue(1000);
 
   constructor (_url: string) {
     this.url = _url;
-    this.indexUrl = url.format({
+    this.indexUrl = nodeUrl.format({
       pathname: path.join(__dirname, '../index.html'),
       protocol: 'file:',
       slashes: true,
@@ -371,7 +376,7 @@ export class AvatarWindow {
           // Same origin policy between top frame and iframe is failed after reload(). (Cause unknown)
           // Create and destroy card for workaround.
           // this.window.webContents.send('reload');
-          const avatar = new AvatarWindow(this.url);
+          const avatar = this;
           const prevWin = this.window;
 
           /**
@@ -471,22 +476,9 @@ export class AvatarWindow {
       }
     });
 
-    this._debouncedResizeQueue.subscribe(rect => {
-      console.debug('Save geometry from will-resize event on main');
-      const action: AvatarSizeUpdateAction = {
-        type: 'avatar-size-update',
-        payload: {
-          url: this.url,
-          geometry: {
-            x: rect.x,
-            y: rect.y,
-            width: rect.width,
-            height: rect.height,
-          },
-        },
-        skipTransfer: true,
-      };
-      emitter.emit('persistent-store-dispatch', action);
+    this._debouncedAvatarSizeUpdateActionQueue.subscribe(rect => {
+      const action = avatarSizeUpdateActionCreator(this.url, rect, true);
+      persistentStoreActionDispatcher(action);
     });
   }
 
@@ -506,23 +498,43 @@ export class AvatarWindow {
     emitter.emit('persistent-store-dispatch', action);
   };
 
-  private _willResizeListener = (event: Electron.Event, newBounds: Electron.Rectangle) => {
+  private _skipForwardRevisions = new Set();
+  public skipForward = (revision: string) => {
+    // console.debug('skipForward: ' + revision);
+    this._skipForwardRevisions.add(revision);
+  };
+
+  public persistentStoreForwarder = (props: {
+    propertyName?: keyof Avatar;
+    state: any;
+    revision?: string;
+  }) => {
+    // Check skipForward when props has revision.
+    // console.debug('Check skipForward:' + props.revision);
+    if (props.revision && this._skipForwardRevisions.has(props.revision)) {
+      this._skipForwardRevisions.delete(props.revision);
+      return;
+    }
+    console.debug(`Forward: ${props.propertyName || 'all properties'} to ${this.url}`);
+    this.window.webContents.send(
+      'persistent-store-forward',
+      props.propertyName,
+      props.state
+    );
+  };
+
+  private _willResizeListener = (event: Electron.Event, rect: Electron.Rectangle) => {
     // Update x, y, width, height
-    this._debouncedResizeQueue.next(newBounds);
-    console.debug('Transfer geometry from will-resize event on main');
-    avatarWindows
-      .get(this.url)!
-      .window.webContents.send('persistent-store-updated', 'geometry', newBounds);
+    this._debouncedAvatarSizeUpdateActionQueue.next(rect);
+    this.persistentStoreForwarder({ propertyName: 'geometry', state: rect });
   };
 
   private _closedListener = () => {
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element.
-    const avatar = avatarWindows.get(this.url);
-    if (avatar) {
-      avatar.removeWindowListeners();
-    }
+    this.removeWindowListeners();
+
     avatarWindows.delete(this.url);
     // Emit window-all-closed event explicitly
     // because Electron sometimes does not emit it automatically.

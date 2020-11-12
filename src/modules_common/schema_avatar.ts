@@ -8,6 +8,8 @@ export type Geometry = {
   height: number;
 };
 
+export type Geometry2D = Omit<Geometry, 'z'>;
+
 /**
  * CardStyle
  * Visual style of a card
@@ -38,8 +40,8 @@ export type Avatar = {
   version: number;
 };
 
-export type AvatarWithSkipTransfer = {
-  skipTransfer: boolean;
+export type AvatarWithSkipForward = {
+  skipForward: boolean;
 } & Avatar;
 
 // For RxDB

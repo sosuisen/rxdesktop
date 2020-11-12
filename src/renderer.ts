@@ -6,8 +6,6 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-import { fromEvent } from 'rxjs';
-import { debounceTime } from 'rxjs/operators';
 import { DebounceQueue } from 'rx-queue';
 import {
   AvatarProp,
@@ -49,8 +47,8 @@ import { getLocationFromUrl } from './modules_common/avatar_url_utils';
 import { getCurrentWorkspaceUrl } from './modules_main/store_workspaces';
 import { setAltDown, setCtrlDown, setMetaDown, setShiftDown } from './modules_common/keys';
 import { Card } from './modules_common/schema_card';
-import { Avatar, Geometry } from './modules_common/schema_avatar';
-import { AvatarSizeUpdateAction } from './modules_common/store.types';
+import { Avatar } from './modules_common/schema_avatar';
+import { avatarSizeUpdateActionCreator } from './modules_common/actions';
 
 let avatarProp: AvatarProp = new AvatarProp('');
 
@@ -188,14 +186,7 @@ const initializeUIEvents = () => {
   let isVerticalMoving = false;
   const debouncedResizeQueue = new DebounceQueue(1000);
   debouncedResizeQueue.subscribe(rect => {
-    const action: AvatarSizeUpdateAction = {
-      type: 'avatar-size-update',
-      payload: {
-        url: avatarProp.url,
-        geometry: rect,
-      },
-      skipTransfer: true,
-    };
+    const action = avatarSizeUpdateActionCreator(avatarProp.url, rect, true);
     window.api.persistentStoreDispatch(action);
   });
 

@@ -8,7 +8,7 @@
 
 import { MessageLabel } from '../modules_common/i18n';
 import { AvatarPropSerializable } from '../modules_common/cardprop';
-import { PersistentStoreAction } from '../modules_common/store.types';
+import { PersistentStoreAction } from '../modules_common/actions';
 
 interface WindowWithAPI extends Window {
   api: {

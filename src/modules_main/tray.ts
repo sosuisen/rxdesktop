@@ -21,11 +21,7 @@ import {
 } from '../modules_common/cardprop';
 import { getRandomInt } from '../modules_common/utils';
 import { cardColors, ColorName, darkenHexColor } from '../modules_common/color';
-import {
-  addAvatarToWorkspace,
-  getNextWorkspaceId,
-  setChangingToWorkspaceId,
-} from './store_workspaces';
+import { addAvatarToWorkspace, setChangingToWorkspaceId } from './store_workspaces';
 import { appIcon } from '../modules_common/const';
 import { getCurrentWorkspace, getWorkspaces } from './store';
 import { avatarWindows } from './avatar_window';

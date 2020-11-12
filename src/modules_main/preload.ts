@@ -7,7 +7,7 @@
  */
 
 import { contextBridge, ipcRenderer, MouseInputEvent } from 'electron';
-import { PersistentStoreAction } from '../modules_common/store.types';
+import { PersistentStoreAction } from '../modules_common/actions';
 
 contextBridge.exposeInMainWorld('api', {
   /**
@@ -128,6 +128,6 @@ ipcRenderer.on('zoom-out', () => window.postMessage({ command: 'zoom-out' }, 'fi
 /**
  * Store Actions
  */
-ipcRenderer.on('persistent-store-updated', (event, propertyName, doc) => {
-  window.postMessage({ command: 'persistent-store-updated', propertyName, doc }, 'file://');
+ipcRenderer.on('persistent-store-forward', (event, propertyName, doc) => {
+  window.postMessage({ command: 'persistent-store-forward', propertyName, doc }, 'file://');
 });

@@ -18,7 +18,6 @@ import {
 } from 'rxdb';
 import leveldown from 'leveldown';
 import { ipcMain } from 'electron';
-import { RxChangeEventUpdate } from 'rxdb/dist/types/rx-change-event';
 import { CardProp } from '../modules_common/cardprop';
 import { getSettings, MESSAGE } from './store_settings';
 import { getIdFromUrl } from '../modules_common/avatar_url_utils';
@@ -28,12 +27,17 @@ import { Card, cardSchema } from '../modules_common/schema_card';
 import {
   Avatar,
   avatarSchema,
-  AvatarWithSkipTransfer,
+  AvatarWithSkipForward,
   Geometry,
+  Geometry2D,
 } from '../modules_common/schema_avatar';
 import { getDocs } from './store_utils';
 import { avatarWindows, createAvatarWindows } from './avatar_window';
-import { PersistentStoreAction, RxDesktopAction } from '../modules_common/store.types';
+import {
+  AvatarPositionUpdateAction,
+  AvatarSizeUpdateAction,
+  PersistentStoreAction,
+} from '../modules_common/actions';
 import { emitter } from './event';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -146,43 +150,24 @@ export const openDB = async () => {
     /**
      * Avatar subscription
      */
-    const skipTransferSet = new Set();
-    const generateSkipTransferKey = (url: string, revision: string) => {
-      return url + '_' + revision;
-    };
-    const transferMustBeSkipped = (changeEvent: RxChangeEventUpdate<any>) => {
-      if (
-        skipTransferSet.has(
-          generateSkipTransferKey(
-            changeEvent.previousData.url,
-            changeEvent.previousData._rev
-          )
-        )
-      ) {
-        return true;
-      }
-      return false;
-    };
     rxdb.avatar.update$.subscribe(changeEvent => {
-      if (!transferMustBeSkipped(changeEvent)) {
-        const avatar: Avatar = (changeEvent.documentData as unknown) as Avatar;
-        console.debug('Transfer updated store to Renderer: ' + avatar.url);
-        avatarWindows
-          .get(avatar.url)!
-          .window.webContents.send('persistent-store-updated', null, avatar);
-      }
+      const avatar: Avatar = (changeEvent.documentData as unknown) as Avatar;
+      avatarWindows.get(avatar.url)!.persistentStoreForwarder({
+        state: avatar,
+        revision: changeEvent.previousData._rev,
+      });
     });
 
     /**
-     * Update of avatar must be atomic to enable 'skipTransfer'
+     * Update of avatar must be atomic to enable 'SkipForward'
      */
     rxdb.avatar.preSave(
-      (plainData: { _rev: string } & AvatarWithSkipTransfer, rxDocument) => {
+      (plainData: { _rev: string } & AvatarWithSkipForward, rxDocument) => {
         // console.debug('preSave: ' + plainData._rev + ',' + plainData.url);
-        if (plainData.skipTransfer) {
-          skipTransferSet.add(generateSkipTransferKey(plainData.url, plainData._rev));
+        if (plainData.skipForward) {
+          avatarWindows.get(plainData.url)!.skipForward(plainData._rev);
         }
-        delete plainData.skipTransfer;
+        delete plainData.skipForward;
       },
       false
     );
@@ -206,7 +191,7 @@ export const prepareDbSync = () => {
     // insert, update, delete
     if (changeEvent.operation === 'INSERT') {
       const payload = changeEvent.documentData;
-      mainWindow.webContents.send('persistent-store-updated', payload);
+      mainWindow.webContents.send('persistent-store-forward', payload);
     }
     else if (changeEvent.operation === 'DELETE') {
       mainWindow.webContents.send(
@@ -808,47 +793,51 @@ export const importJSON = async (filepath: string) => {
   console.debug('Finished');
 };
 
-// eslint-disable-next-line complexity
-const actionHandler = async (action: PersistentStoreAction) => {
+const avatarUpdater = async (
+  action: PersistentStoreAction,
+  reducer: (avatar: Avatar) => Avatar
+) => {
+  const url: string = action.payload.url;
+  const docRx: RxDocument = await rxdb.avatar.findOne(url).exec();
+  if (docRx) {
+    const avatarClone: Avatar = (docRx.toJSON() as unknown) as Avatar;
+    const newAvatar: AvatarWithSkipForward = reducer(avatarClone) as AvatarWithSkipForward;
+    newAvatar.skipForward = action.skipForward ?? false;
+    await docRx.atomicPatch(newAvatar).catch(e => console.error(e));
+  }
+  else {
+    console.error(`Error: ${url} does not exist in DB`);
+  }
+};
+
+const avatarPositionUpdater = async (action: AvatarPositionUpdateAction) => {
+  const updatedGeometry: Partial<Geometry> = action.payload.geometry;
+  await avatarUpdater(action, (avatar: Avatar) => {
+    avatar.geometry.x = updatedGeometry.x ?? avatar.geometry.x;
+    avatar.geometry.y = updatedGeometry.y ?? avatar.geometry.y;
+    return avatar;
+  });
+};
+
+const avatarSizeUpdater = async (action: AvatarSizeUpdateAction) => {
+  const updatedGeometry: Partial<Geometry> = action.payload.geometry;
+  await avatarUpdater(action, (avatar: Avatar) => {
+    avatar.geometry.x = updatedGeometry.x ?? avatar.geometry.x;
+    avatar.geometry.y = updatedGeometry.y ?? avatar.geometry.y;
+    avatar.geometry.width = updatedGeometry.width ?? avatar.geometry.width;
+    avatar.geometry.height = updatedGeometry.height ?? avatar.geometry.height;
+    return avatar;
+  });
+};
+
+const storeUpdater = async (action: PersistentStoreAction) => {
   switch (action.type) {
     case 'avatar-position-update': {
-      const url: string = action.payload.url;
-      const geometry: Partial<Geometry> = action.payload.geometry;
-      const docRx: RxDocument = await rxdb.avatar.findOne(url).exec();
-      if (docRx) {
-        const newDocRx = await docRx.atomicUpdate(oldDoc => {
-          const avatar = (oldDoc as unknown) as Avatar;
-          avatar.geometry.x = geometry.x ?? avatar.geometry.x;
-          avatar.geometry.y = geometry.y ?? avatar.geometry.y;
-          return avatar;
-        });
-        avatarWindows
-          .get(url)!
-          .window.webContents.send('persistent-store-updated', newDocRx.toJSON());
-      }
-      else {
-        console.error(`Error: ${url} does not exist in DB`);
-      }
+      await avatarPositionUpdater(action);
       break;
     }
     case 'avatar-size-update': {
-      const url: string = action.payload.url;
-      const geometry: Partial<Geometry> = action.payload.geometry;
-      const docRx: RxDocument = await rxdb.avatar.findOne(url).exec();
-      if (docRx) {
-        const avatar: AvatarWithSkipTransfer = (docRx.toJSON() as unknown) as AvatarWithSkipTransfer;
-        avatar.geometry.x = geometry.x ?? avatar.geometry.x;
-        avatar.geometry.y = geometry.y ?? avatar.geometry.y;
-        avatar.geometry.width = geometry.width ?? avatar.geometry.width;
-        avatar.geometry.height = geometry.height ?? avatar.geometry.height;
-
-        avatar.skipTransfer = action.skipTransfer ?? false;
-        console.debug('avatar-size-update from renderer');
-        await docRx.atomicPatch(avatar).catch(e => console.error(e));
-      }
-      else {
-        console.error(`Error: ${url} does not exist in DB`);
-      }
+      await avatarSizeUpdater(action);
       break;
     }
     default:
@@ -856,13 +845,12 @@ const actionHandler = async (action: PersistentStoreAction) => {
   }
 };
 
-ipcMain.handle(
-  'persistent-store-dispatch',
-  async (event: any, action: PersistentStoreAction) => {
-    await actionHandler(action).catch(e => console.debug(e));
-  }
-); // from renderer
-emitter.on(
-  'persistent-store-dispatch',
-  async (action: PersistentStoreAction) => await actionHandler(action)
-); // from main
+ipcMain.handle('persistent-store-dispatch', async (ev, action: PersistentStoreAction) => {
+  console.debug(`Call storeUpdater() from Renderer process: ${action.type}`);
+  await storeUpdater(action).catch(e => console.debug(e));
+});
+
+emitter.on('persistent-store-dispatch', async (action: PersistentStoreAction) => {
+  console.debug(`Call storeUpdater() from Main process: ${action.type}`);
+  await storeUpdater(action).catch(e => console.debug(e));
+});

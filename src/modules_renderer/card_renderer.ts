@@ -355,7 +355,7 @@ const dispatch = (event: MessageEvent) => {
     event.source !== window ||
     event.data.command === undefined ||
     event.data.doc === undefined ||
-    event.data.command !== 'persistent-store-updated'
+    event.data.command !== 'persistent-store-forward'
   )
     return;
 
