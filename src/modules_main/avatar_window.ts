@@ -504,6 +504,7 @@ export class AvatarWindow {
     this._skipForwardRevisions.add(revision);
   };
 
+  // Forward changes on persistent store to Renderer process
   public persistentStoreForwarder = (props: {
     propertyName?: keyof Avatar;
     state: any;
