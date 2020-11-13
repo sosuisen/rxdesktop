@@ -9,7 +9,7 @@ skinparam activity {
 
 
 partition "Main Process" {
-    "_willResizeListener/_willMoveListener" -down-> ===B1===
+    "_willResizeListener/_willMoveListener" --> ===B1===
 
     partition "Database Update" #fff0e0 {
         ===B1=== --> [rect] "_debouncedAvatarSizeUpdateActionQueue"
@@ -21,15 +21,10 @@ partition "Main Process" {
         "storeUpdater(action)" --> [action] "avatarUpdater(action, reducer(avatar))"
     }
     partition "Reactive Presentation Update\n(Forward to Renderer)" #e0ffe0 {
-        ===B1=== --> [{ state: rect,                         \n propertyName: 'geometry' }] "reactiveForwarder"
-        if "skipForward flag?" then
-            -->[true] "Abort" #ffff00 
-        else
-            -->[false] "window.webContents.send"
-        endif
-        "window.webContents.send" --> ['reactive-forward' event\n with updated state] "(preload)\n ipcRenderer - postMessage bridge"
+        ===B1=== --> [{ state: rect, propertyName: 'geometry' }] "reactiveForwarder"
+        --> ['reactive-forward' event\n with updated state] "(preload)\n ipcRenderer - postMessage bridge"
     }
-    "Observer" #e0ffe0 -right-> [{ state: avatar,\n revision }] "reactiveForwarder"    
+    "Forwarding Observer" #e0ffe0 -right-> [{ state: avatar }] "reactiveForwarder"    
     "loadCurrentWorkspace()" -up-> ['render-card' event with card and avatar] "(preload)\n ipcRenderer - postMessage bridge" 
 
 }
@@ -38,14 +33,19 @@ partition RxDB  #fff0e0 {
     "avatarUpdater(action, reducer(avatar))" --> [new avatar] "start atomicPatch"    
     "start atomicPatch" -left-> [new avatar] "preSave hook"
     if "skipForward?" then
-        --> [true] "set skipForward flag" #ffff00 
+        --> [true] "reserve skipForward" #ffff00 
         -right-> "Save"
     else 
         --> [false] "Save"
     "Save" -down-> "Observable Avatar"
+    "Observable Avatar" #e0ffe0 --> "skipForward Filter" #e0ffe0
+    note left
+        execute
+        skipForward
+    end note
 
-    "Observer" --> [subscribe] "Observable Avatar" 
-    "Observable Avatar" #e0ffe0 --> [update event\n with new avatar] "Observer"
+    "Forwarding Observer" --> [subscribe] "skipForward Filter"
+    "skipForward Filter" --> [update event\n with new avatar] "Forwarding Observer"
 }            
 
 partition "GitHub Plugin" #fff0e0 {
@@ -68,16 +68,16 @@ partition "Renderer Process" {
     }
     partition "Database Update\n(Forward to Main)" #fff0e0 {
     ===B2=== --> [rect] "debouncedResizeQueue"
-        "debouncedResizeQueue" --> [debounce 1000ms] "persistentStoreDispatcher(action)"
+        "debouncedResizeQueue" --> [debounce 1000ms] "persistentStoreActionDispatcherFromRenderer(action)"
         note bottom 
           skipForward is set to true
         end note    
-        "persistentStoreDispatcher(action)" -right-> [action] "storeUpdater(action)"     
+        "persistentStoreActionDispatcherFromRenderer(action)" -right-> [action] "storeUpdater(action)"     
     }
 }
 
 "User Mouse Dragging\n Dragging title bar to move window\n Dragging edges to resize window" #ffc0c0 --> ===B0===
---> ['will-resize' or 'will-move' event] "_willResizeListener/_willMoveListener"
+-right-> ['will-resize' or 'will-move' event] "_willResizeListener/_willMoveListener"
 note top
     Window position and size
     are changed immediately
