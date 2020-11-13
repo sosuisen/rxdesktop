@@ -380,9 +380,14 @@ const dispatch = (event: MessageEvent) => {
     ) {
       onResizeByHand(geometry);
     }
-    else if (avatarProp.geometry.x !== geometry.x || avatarProp.geometry.y !== geometry.y) {
+
+    if (avatarProp.geometry.x !== geometry.x || avatarProp.geometry.y !== geometry.y) {
       avatarProp.geometry.x = geometry.x;
       avatarProp.geometry.y = geometry.y;
+    }
+
+    if (avatarProp.geometry.z !== geometry.z) {
+      avatarProp.geometry.z = geometry.z;
     }
   }
 };

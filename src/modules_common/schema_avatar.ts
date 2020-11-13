@@ -9,6 +9,7 @@ export type Geometry = {
 };
 
 export type Geometry2D = Omit<Geometry, 'z'>;
+export type GeometryXY = Omit<Geometry, 'z' | 'width' | 'height'>;
 
 /**
  * CardStyle

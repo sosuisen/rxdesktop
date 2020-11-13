@@ -11,7 +11,7 @@ import { scheme } from '../modules_common/const';
 let currentWorkspaceId = '0'; // string expression of positive number
 let changingToWorkspaceId = 'none'; // changingToWorkspaceId stores next id while workspace is changing, 'none' or 'exit'
 
-export type Workspace = {
+type Workspace = {
   name: string;
   avatars: string[];
 };

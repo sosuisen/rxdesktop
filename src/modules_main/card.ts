@@ -69,7 +69,7 @@ export const cards: Map<string, Card> = new Map<string, Card>();
 const MINIMUM_WINDOW_WIDTH = 185; // 180 + shadowWidth
 const MINIMUM_WINDOW_HEIGHT = 80;
 
-export const avatars: Map<string, Avatar> = new Map<string, Avatar>();
+const avatars: Map<string, Avatar> = new Map<string, Avatar>();
 
 /**
  * Focus control
@@ -467,7 +467,7 @@ const setContextMenu = (prop: AvatarProp, win: BrowserWindow) => {
   return resetContextMenu;
 };
 
-export class Avatar {
+class Avatar {
   public prop: AvatarProp;
   public window: BrowserWindow;
   public indexUrl: string;

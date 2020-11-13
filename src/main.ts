@@ -12,8 +12,6 @@ import { DialogButton } from './modules_common/const';
 import { AvatarPropSerializable, CardPropSerializable } from './modules_common/cardprop';
 import { availableLanguages, defaultLanguage, MessageLabel } from './modules_common/i18n';
 import {
-  avatars,
-  cards,
   createCard,
   deleteAvatar,
   deleteCardWithRetry,
@@ -33,12 +31,20 @@ import { getIdFromUrl } from './modules_common/avatar_url_utils';
 import {
   closeDB,
   dumpDB,
+  getCurrentAvatars,
   loadCurrentWorkspace,
   openDB,
   prepareDbSync,
   updateWorkspaceStatus,
 } from './modules_main/store';
-import { avatarWindows } from './modules_main/avatar_window';
+import {
+  avatarWindows,
+  getZIndexOfTopAvatar,
+  setZIndexOfTopAvatar,
+} from './modules_main/avatar_window';
+import { avatarDepthUpdateActionCreator } from './modules_common/actions';
+import { persistentStoreActionDispatcher } from './modules_main/store_utils';
+import { Avatar } from './modules_common/schema_avatar';
 
 // process.on('unhandledRejection', console.dir);
 
@@ -99,8 +105,7 @@ emitter.on('exit', () => {
 emitter.on('change-workspace', (nextWorkspaceId: string) => {
   handlers.forEach(channel => ipcMain.removeHandler(channel));
   handlers.length = 0; // empty
-  avatars.clear();
-  cards.clear();
+  avatarWindows.clear();
   setCurrentWorkspaceId(nextWorkspaceId);
   setTrayContextMenu();
   updateWorkspaceStatus();
@@ -147,57 +152,57 @@ ipcMain.handle('create-card', async (event, propObject: CardPropSerializable) =>
 });
 
 ipcMain.handle('blur-and-focus-with-suppress-events', (event, url: string) => {
-  const avatar = avatars.get(url);
-  if (avatar) {
+  const avatarWindow = avatarWindows.get(url);
+  if (avatarWindow) {
     console.debug(`blurAndFocus: ${url}`);
     /**
      * When a card is blurred, another card will be focused automatically by OS.
      * Set suppressGlobalFocusEvent to suppress to focus another card.
      */
     setGlobalFocusEventListenerPermission(false);
-    avatar.suppressBlurEventOnce = true;
-    avatar.window.blur();
-    avatar.suppressFocusEventOnce = true;
-    avatar.recaptureGlobalFocusEventAfterLocalFocusEvent = true;
-    avatar.window.focus();
+    avatarWindow.suppressBlurEventOnce = true;
+    avatarWindow.window.blur();
+    avatarWindow.suppressFocusEventOnce = true;
+    avatarWindow.recaptureGlobalFocusEventAfterLocalFocusEvent = true;
+    avatarWindow.window.focus();
   }
 });
 
 ipcMain.handle('blur-and-focus-with-suppress-focus-event', (event, url: string) => {
-  const avatar = avatars.get(url);
-  if (avatar) {
+  const avatarWindow = avatarWindows.get(url);
+  if (avatarWindow) {
     console.debug(`blurAndFocus: ${url}`);
     /**
      * When a card is blurred, another card will be focused automatically by OS.
      * Set suppressGlobalFocusEvent to suppress to focus another card.
      */
     setGlobalFocusEventListenerPermission(false);
-    avatar.window.blur();
-    avatar.recaptureGlobalFocusEventAfterLocalFocusEvent = true;
-    avatar.window.focus();
+    avatarWindow.window.blur();
+    avatarWindow.recaptureGlobalFocusEventAfterLocalFocusEvent = true;
+    avatarWindow.window.focus();
   }
 });
 
 ipcMain.handle('blur', (event, url: string) => {
-  const avatar = avatars.get(url);
-  if (avatar) {
+  const avatarWindow = avatarWindows.get(url);
+  if (avatarWindow) {
     console.debug(`blur: ${url}`);
-    avatar.window.blur();
+    avatarWindow.window.blur();
   }
 });
 
 ipcMain.handle('focus', (event, url: string) => {
-  const avatar = avatars.get(url);
-  if (avatar) {
+  const avatarWindow = avatarWindows.get(url);
+  if (avatarWindow) {
     console.debug(`focus: ${url}`);
-    avatar.window.focus();
+    avatarWindow.window.focus();
   }
 });
 
 ipcMain.handle('set-title', (event, url: string, title: string) => {
-  const avatar = avatars.get(url);
-  if (avatar) {
-    avatar.window.setTitle(title);
+  const avatarWindow = avatarWindows.get(url);
+  if (avatarWindow) {
+    avatarWindow.window.setTitle(title);
   }
 });
 
@@ -207,11 +212,11 @@ ipcMain.handle('alert-dialog', (event, url: string, label: MessageLabel) => {
     win = settingsDialog;
   }
   else {
-    const avatar = avatars.get(url);
-    if (!avatar) {
+    const avatarWindow = avatarWindows.get(url);
+    if (!avatarWindow) {
       return;
     }
-    win = avatar.window;
+    win = avatarWindow.window;
   }
 
   dialog.showMessageBoxSync(win, {
@@ -229,11 +234,11 @@ ipcMain.handle(
       win = settingsDialog;
     }
     else {
-      const avatar = avatars.get(url);
-      if (!avatar) {
+      const avatarWindow = avatarWindows.get(url);
+      if (!avatarWindow) {
         return;
       }
-      win = avatar.window;
+      win = avatarWindow.window;
     }
 
     const buttons: string[] = buttonLabels.map(buttonLabel => MESSAGE(buttonLabel));
@@ -248,88 +253,95 @@ ipcMain.handle(
 );
 
 ipcMain.handle('set-window-size', (event, url: string, width: number, height: number) => {
-  const avatar = avatars.get(url);
+  const avatarWindow = avatarWindows.get(url);
   // eslint-disable-next-line no-unused-expressions
-  avatar?.window.setSize(width, height);
-  return avatar?.window.getBounds();
+  avatarWindow?.window.setSize(width, height);
+  return avatarWindow?.window.getBounds();
 });
 
 ipcMain.handle('set-window-position', (event, url: string, x: number, y: number) => {
-  const avatar = avatars.get(url);
+  const avatarWindow = avatarWindows.get(url);
   // eslint-disable-next-line no-unused-expressions
-  avatar?.window.setPosition(x, y);
-  return avatar?.window.getBounds();
+  avatarWindow?.window.setPosition(x, y);
+  return avatarWindow?.window.getBounds();
 });
 
 ipcMain.handle('get-uuid', () => {
   return uuidv4();
 });
 
-ipcMain.handle('bring-to-front', (event, url: string, rearrange = false) => {
-  const avatar = avatars.get(url);
-  if (!avatar) {
-    return;
-  }
-
-  const backToFront = [...avatars.keys()].sort((a, b) => {
-    if (avatars.get(a)!.prop.geometry.z < avatars.get(b)!.prop.geometry.z) {
-      return -1;
-    }
-    else if (avatars.get(a)!.prop.geometry.z > avatars.get(b)!.prop.geometry.z) {
-      return 1;
-    }
-    return 0;
-  });
-
-  const newZ = avatars.get(backToFront[backToFront.length - 1])!.prop.geometry.z + 1;
-  backToFront.splice(backToFront.indexOf(url), 1);
-  backToFront.push(url);
+ipcMain.handle('bring-to-front', async (event, url: string, rearrange = false) => {
+  // Database Update
+  const zIndexOfTopAvatar = getZIndexOfTopAvatar() + 1;
+  console.debug(`new zIndex: ${zIndexOfTopAvatar}`);
+  const action = avatarDepthUpdateActionCreator(url, zIndexOfTopAvatar, false);
+  persistentStoreActionDispatcher(action);
+  // persistentStoreActionDispatcher works synchronously,
+  // so DB has been already updated here.
+  setZIndexOfTopAvatar(zIndexOfTopAvatar);
 
   // NOTE: When bring-to-front is invoked by focus event, the card has been already brought to front.
   if (rearrange) {
-    for (const key of backToFront) {
-      avatars.get(key)!.suppressFocusEventOnce = true;
-      avatars.get(key)!.window.focus();
-    }
-  }
+    const avatars: Avatar[] = await getCurrentAvatars();
 
-  return newZ;
+    const backToFront = avatars.sort((a, b) => {
+      if (a.geometry.z < b.geometry.z) {
+        return -1;
+      }
+      else if (a.geometry.z > b.geometry.z) {
+        return 1;
+      }
+      return 0;
+    });
+
+    backToFront.forEach(avatar => {
+      console.debug(`sorting zIndex..: ${avatar.geometry.z}`);
+      const avatarWin = avatarWindows.get(avatar.url);
+      if (avatarWin && !avatarWin.window.isDestroyed()) {
+        avatarWin.window.moveTop();
+      }
+    });
+  }
 });
 
-ipcMain.handle('send-to-back', (event, url: string) => {
-  const avatar = avatars.get(url);
-  if (!avatar) {
-    return;
-  }
+ipcMain.handle('send-to-back', async (event, url: string) => {
+  const avatars: Avatar[] = await getCurrentAvatars();
 
-  const backToFront = [...avatars.keys()].sort((a, b) => {
-    if (avatars.get(a)!.prop.geometry.z < avatars.get(b)!.prop.geometry.z) {
+  const backToFront = avatars.sort((a, b) => {
+    if (a.geometry.z < b.geometry.z) {
       return -1;
     }
-    else if (avatars.get(a)!.prop.geometry.z > avatars.get(b)!.prop.geometry.z) {
+    else if (a.geometry.z > b.geometry.z) {
       return 1;
     }
     return 0;
   });
 
-  const newZ = avatars.get(backToFront[0])!.prop.geometry.z - 1;
-  backToFront.splice(backToFront.indexOf(url), 1);
-  backToFront.unshift(url);
+  // Database Update
+  const zIndexOfBottomAvatar = backToFront[0].geometry.z - 1;
+  console.debug(`new zIndex: ${zIndexOfBottomAvatar}`);
+  const action = avatarDepthUpdateActionCreator(url, zIndexOfBottomAvatar, false);
+  persistentStoreActionDispatcher(action);
+  // persistentStoreActionDispatcher works synchronously,
+  // so DB has been already updated here.
 
-  for (const key of backToFront) {
-    avatars.get(key)!.suppressFocusEventOnce = true;
-    avatars.get(key)!.window.focus();
-  }
-  return newZ;
+  backToFront.forEach(avatar => {
+    console.debug(`sorting zIndex..: ${avatar.geometry.z}`);
+    const avatarWin = avatarWindows.get(avatar.url);
+    if (avatarWin && !avatarWin.window.isDestroyed()) {
+      avatarWin!.suppressFocusEventOnce = true;
+      avatarWin!.window.focus();
+    }
+  });
 });
 
 ipcMain.handle(
   'send-mouse-input',
   (event, url: string, mouseInputEvent: MouseInputEvent) => {
-    const avatar = avatars.get(url);
-    if (!avatar) {
+    const avatarWindow = avatarWindows.get(url);
+    if (!avatarWindow) {
       return;
     }
-    avatar.window.webContents.sendInputEvent(mouseInputEvent);
+    avatarWindow.window.webContents.sendInputEvent(mouseInputEvent);
   }
 );

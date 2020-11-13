@@ -378,7 +378,7 @@ const onCardClose = () => {
   close();
 };
 
-const onCardFocused = () => {
+const onCardFocused = async () => {
   if (suppressFocusEvent) {
     return;
   }
@@ -386,11 +386,11 @@ const onCardFocused = () => {
   avatarProp.status = 'Focused';
   render(['CardStyle', 'ContentsRect']);
 
-  /** 
-  const newZ = await window.api.bringToFront(avatarProp.url);
+  await window.api.bringToFront(avatarProp.url);
+  // const newZ = await window.api.bringToFront(avatarProp.url);
   // eslint-disable-next-line require-atomic-updates
-  avatarProp.geometry.z = newZ;
-
+  // avatarProp.geometry.z = newZ;
+  /** 
   saveCard(avatarProp);
   */
 };

@@ -22,18 +22,18 @@ import { DebounceQueue } from 'rx-queue';
 import { DialogButton } from '../modules_common/const';
 import { getSettings, globalDispatch, MESSAGE } from './store_settings';
 import { getIdFromUrl } from '../modules_common/avatar_url_utils';
-import { emitter, handlers } from './event';
+import { handlers } from './event';
 import { cardColors, ColorName } from '../modules_common/color';
 import { getCurrentWorkspaceId, workspaces } from './store_workspaces';
 import { Avatar } from '../modules_common/schema_avatar';
 import { Card } from '../modules_common/schema_card';
 import { AvatarUrl } from '../modules_common/schema_workspace';
 import {
-  AvatarPositionUpdateAction,
   avatarPositionUpdateActionCreator,
   avatarSizeUpdateActionCreator,
   PersistentStoreAction,
 } from '../modules_common/actions';
+import { persistentStoreActionDispatcher } from './store_utils';
 
 /**
  * Const
@@ -45,10 +45,18 @@ export const avatarWindows: Map<AvatarUrl, AvatarWindow> = new Map<
   AvatarUrl,
   AvatarWindow
 >();
+
 /**
  * Focus control
  */
 let globalFocusListenerPermission = true;
+let zIndexOfTopAvatar: number;
+export const setZIndexOfTopAvatar = (value: number) => {
+  zIndexOfTopAvatar = value;
+};
+export const getZIndexOfTopAvatar = () => {
+  return zIndexOfTopAvatar;
+};
 /**
  * Set permission to call focus event listener in all renderer processes.
  */
@@ -271,10 +279,6 @@ const setContextMenu = (win: BrowserWindow) => {
   };
 
   return resetContextMenu;
-};
-
-const persistentStoreActionDispatcher = (action: PersistentStoreAction) => {
-  emitter.emit('persistent-store-dispatch', action);
 };
 
 export class AvatarWindow {

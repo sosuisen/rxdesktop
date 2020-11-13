@@ -11,7 +11,9 @@ import { RxCollection, RxDocument } from 'rxdb';
 import { Avatar } from '../modules_common/schema_avatar';
 import { Card } from '../modules_common/schema_card';
 import { CartaDocument } from '../modules_common/types';
-import { Workspace } from './store_workspaces';
+import { Workspace } from '../modules_common/schema_workspace';
+import { PersistentStoreAction } from '../modules_common/actions';
+import { emitter } from './event';
 
 type CartaTypes = Workspace | Avatar | Card;
 
@@ -99,4 +101,9 @@ const getSelectedDocs = async (
     throw new Error(e);
   })) as Map<string, RxDocument>;
   return [...cardDocsMap.values()].map(doc => doc.toJSON()) as CartaDocument[];
+};
+
+export const persistentStoreActionDispatcher = (action: PersistentStoreAction) => {
+  // emitter.emit calls listener synchronously
+  emitter.emit('persistent-store-dispatch', action);
 };

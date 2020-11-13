@@ -31,10 +31,13 @@ import {
   AvatarWithRevision,
   AvatarWithSkipForward,
   Geometry,
+  Geometry2D,
+  GeometryXY,
 } from '../modules_common/schema_avatar';
 import { getDocs } from './store_utils';
-import { avatarWindows, createAvatarWindows } from './avatar_window';
+import { avatarWindows, createAvatarWindows, setZIndexOfTopAvatar } from './avatar_window';
 import {
+  AvatarDepthUpdateAction,
   AvatarPositionUpdateAction,
   AvatarSizeUpdateAction,
   PersistentStoreAction,
@@ -296,9 +299,7 @@ export const loadCurrentWorkspace = async () => {
 
   // console.dir(currentWorkspaceRx.toJSON(), { depth: null });
 
-  const avatars: Avatar[] = (((await currentWorkspaceRx.populate(
-    'avatars'
-  )) as unknown) as RxDocument[]).map(avatarDoc => avatarDoc.toJSON() as Avatar);
+  const avatars: Avatar[] = await getCurrentAvatars(currentWorkspaceRx);
 
   //  console.dir(avatars, { depth: null });
 
@@ -320,7 +321,6 @@ export const loadCurrentWorkspace = async () => {
 
   await createAvatarWindows(cardMap, avatars);
 
-  // TODO: Arrange avatars
   const backToFront = avatars.sort((a, b) => {
     if (a.geometry.z < b.geometry.z) {
       return -1;
@@ -331,12 +331,15 @@ export const loadCurrentWorkspace = async () => {
     return 0;
   });
 
+  let zIndexOfTopAvatar = 0;
   backToFront.forEach(avatar => {
     const avatarWin = avatarWindows.get(avatar.url);
     if (avatarWin && !avatarWin.window.isDestroyed()) {
       avatarWin.window.moveTop();
+      zIndexOfTopAvatar = avatar.geometry.z;
     }
   });
+  setZIndexOfTopAvatar(zIndexOfTopAvatar);
 
   console.debug(`Completed to load ${avatars.length} cards`);
 
@@ -467,6 +470,23 @@ export const updateWorkspaceStatus = async () => {
 };
 
 // ! Operations for avatars
+
+/**
+ * Avatar
+ */
+export const getCurrentAvatars = async (
+  currentWorkspaceRx?: RxDocument
+): Promise<Avatar[]> => {
+  if (!currentWorkspaceRx) {
+    currentWorkspaceRx = ((await getCurrentWorkspaceRx()) as unknown) as RxDocument;
+  }
+  if (currentWorkspaceRx) {
+    return (((await currentWorkspaceRx.populate(
+      'avatars'
+    )) as unknown) as RxDocument[]).map(avatarDoc => avatarDoc.toJSON() as Avatar);
+  }
+  return [];
+};
 
 const addNewAvatar = () => {
   /*
@@ -838,7 +858,7 @@ const avatarUpdater = async (
 };
 
 const avatarPositionUpdater = async (action: AvatarPositionUpdateAction) => {
-  const updatedGeometry: Partial<Geometry> = action.payload.geometry;
+  const updatedGeometry: GeometryXY = action.payload.geometry;
   await avatarUpdater(action, (avatar: Avatar) => {
     avatar.geometry.x = updatedGeometry.x ?? avatar.geometry.x;
     avatar.geometry.y = updatedGeometry.y ?? avatar.geometry.y;
@@ -847,12 +867,20 @@ const avatarPositionUpdater = async (action: AvatarPositionUpdateAction) => {
 };
 
 const avatarSizeUpdater = async (action: AvatarSizeUpdateAction) => {
-  const updatedGeometry: Partial<Geometry> = action.payload.geometry;
+  const updatedGeometry: Geometry2D = action.payload.geometry;
   await avatarUpdater(action, (avatar: Avatar) => {
     avatar.geometry.x = updatedGeometry.x ?? avatar.geometry.x;
     avatar.geometry.y = updatedGeometry.y ?? avatar.geometry.y;
     avatar.geometry.width = updatedGeometry.width ?? avatar.geometry.width;
     avatar.geometry.height = updatedGeometry.height ?? avatar.geometry.height;
+    return avatar;
+  });
+};
+
+const avatarDepthUpdater = async (action: AvatarDepthUpdateAction) => {
+  const updatedZ: number = action.payload.z;
+  await avatarUpdater(action, (avatar: Avatar) => {
+    avatar.geometry.z = updatedZ ?? avatar.geometry.z;
     return avatar;
   });
 };
@@ -867,6 +895,10 @@ const storeUpdater = async (action: PersistentStoreAction) => {
       await avatarSizeUpdater(action);
       break;
     }
+    case 'avatar-depth-update': {
+      await avatarDepthUpdater(action);
+      break;
+    }    
     default:
       break;
   }
