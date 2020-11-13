@@ -28,7 +28,9 @@ interface WindowWithAPI extends Window {
     finishRenderCard: (url: string) => Promise<void>;
     focus: (url: string) => Promise<void>;
     getUuid: () => Promise<string>;
-    persistentStoreDispatcher: (action: PersistentStoreAction) => Promise<void>;
+    persistentStoreActionDispatcherFromRenderer: (
+      action: PersistentStoreAction
+    ) => Promise<void>;
     updateAvatar: (avatarPropSerializable: AvatarPropSerializable) => Promise<void>;
     sendLeftMouseDown: (url: string, x: number, y: number) => Promise<void>;
     sendToBack: (url: string) => Promise<number>;

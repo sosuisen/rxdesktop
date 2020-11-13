@@ -187,7 +187,7 @@ const initializeUIEvents = () => {
   const debouncedResizeQueue = new DebounceQueue(1000);
   debouncedResizeQueue.subscribe(rect => {
     const action = avatarSizeUpdateActionCreator(avatarProp.url, rect, true);
-    window.api.persistentStoreDispatcher(action);
+    window.api.persistentStoreActionDispatcherFromRenderer(action);
   });
 
   const onmousemove = (event: MouseEvent) => {

@@ -49,7 +49,7 @@ contextBridge.exposeInMainWorld('api', {
   getUuid: () => {
     return ipcRenderer.invoke('get-uuid');
   },
-  persistentStoreDispatcher: (action: PersistentStoreAction) => {
+  persistentStoreActionDispatcherFromRenderer: (action: PersistentStoreAction) => {
     return ipcRenderer.invoke('persistent-store-dispatch', action);
   },
   updateAvatar: (avatarPropSerializable: Record<string, any>) => {
