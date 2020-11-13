@@ -149,7 +149,7 @@ export const openDB = async () => {
     await Promise.all(collections.map(collection => rxdb.collection(collection)));
 
     /**
-     * Avatar Observer
+     * Forwarding Observer
      */
     const skipForwardRevisions = new Set();
     const generateSkipKey = (avatarWithRev: AvatarWithRevision) => {
