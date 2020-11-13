@@ -18,6 +18,7 @@ import {
 } from 'rxdb';
 import leveldown from 'leveldown';
 import { ipcMain } from 'electron';
+import { filter } from 'rxjs/operators';
 import { CardProp } from '../modules_common/cardprop';
 import { getSettings, MESSAGE } from './store_settings';
 import { getIdFromUrl } from '../modules_common/avatar_url_utils';
@@ -27,9 +28,9 @@ import { Card, cardSchema } from '../modules_common/schema_card';
 import {
   Avatar,
   avatarSchema,
+  AvatarWithRevision,
   AvatarWithSkipForward,
   Geometry,
-  Geometry2D,
 } from '../modules_common/schema_avatar';
 import { getDocs } from './store_utils';
 import { avatarWindows, createAvatarWindows } from './avatar_window';
@@ -148,15 +149,40 @@ export const openDB = async () => {
     await Promise.all(collections.map(collection => rxdb.collection(collection)));
 
     /**
-     * Avatar subscription
+     * Avatar Observer
      */
-    rxdb.avatar.update$.subscribe(changeEvent => {
-      const avatar: Avatar = (changeEvent.documentData as unknown) as Avatar;
-      avatarWindows.get(avatar.url)!.reactiveForwarder({
-        state: avatar,
-        revision: changeEvent.previousData._rev,
+    const skipForwardRevisions = new Set();
+    const generateSkipKey = (avatarWithRev: AvatarWithRevision) => {
+      return avatarWithRev.url + '_' + avatarWithRev._rev;
+    };
+    const reserveSkipForward = (avatarWithRev: AvatarWithRevision) => {
+      skipForwardRevisions.add(generateSkipKey(avatarWithRev));
+    };
+    const executeSkipForward = (prevData: AvatarWithRevision) => {
+      if (skipForwardRevisions.has(generateSkipKey(prevData))) {
+        skipForwardRevisions.delete(generateSkipKey(prevData));
+        return true;
+      }
+      return false;
+    };
+
+    rxdb.avatar.update$
+      .pipe(
+        filter(changeEvent => {
+          const prevData = (changeEvent.previousData as unknown) as AvatarWithRevision;
+          // Execute skipForward
+          if (executeSkipForward(prevData)) {
+            return false;
+          }
+          return true;
+        })
+      )
+      .subscribe(changeEvent => {
+        const avatar: Avatar = (changeEvent.documentData as unknown) as Avatar;
+        avatarWindows.get(avatar.url)!.reactiveForwarder({
+          state: avatar,
+        });
       });
-    });
 
     /**
      * Update of avatar must be atomic to enable 'SkipForward'
@@ -165,7 +191,8 @@ export const openDB = async () => {
       (plainData: { _rev: string } & AvatarWithSkipForward, rxDocument) => {
         // console.debug('preSave: ' + plainData._rev + ',' + plainData.url);
         if (plainData.skipForward) {
-          avatarWindows.get(plainData.url)!.skipForward(plainData._rev);
+          reserveSkipForward(plainData);
+          avatarWindows.get(plainData.url);
         }
         delete plainData.skipForward;
       },

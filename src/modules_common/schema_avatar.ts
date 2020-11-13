@@ -41,7 +41,11 @@ export type Avatar = {
 };
 
 export type AvatarWithSkipForward = {
-  skipForward: boolean;
+  skipForward?: boolean;
+} & Avatar;
+
+export type AvatarWithRevision = {
+  _rev?: string;
 } & Avatar;
 
 // For RxDB

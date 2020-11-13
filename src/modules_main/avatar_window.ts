@@ -488,24 +488,8 @@ export class AvatarWindow {
     });
   }
 
-  private _skipForwardRevisions = new Set();
-  public skipForward = (revision: string) => {
-    // console.debug('skipForward: ' + revision);
-    this._skipForwardRevisions.add(revision);
-  };
-
   // Forward changes on persistent store to Renderer process
-  public reactiveForwarder = (props: {
-    propertyName?: keyof Avatar;
-    state: any;
-    revision?: string;
-  }) => {
-    // Check skipForward when props has revision.
-    // console.debug('Check skipForward:' + props.revision);
-    if (props.revision && this._skipForwardRevisions.has(props.revision)) {
-      this._skipForwardRevisions.delete(props.revision);
-      return;
-    }
+  public reactiveForwarder = (props: { propertyName?: keyof Avatar; state: any }) => {
     console.debug(`Forward: ${props.propertyName || 'all properties'} to ${this.url}`);
     this.window.webContents.send('reactive-forward', props.propertyName, props.state);
   };
