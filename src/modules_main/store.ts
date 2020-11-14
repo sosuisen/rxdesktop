@@ -898,7 +898,7 @@ const storeUpdater = async (action: PersistentStoreAction) => {
     case 'avatar-depth-update': {
       await avatarDepthUpdater(action);
       break;
-    }    
+    }
     default:
       break;
   }
