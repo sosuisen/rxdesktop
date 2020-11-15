@@ -333,13 +333,19 @@ export class AvatarWindow {
     // Resized by hand
     // will-resize is only emitted when the window is being resized manually.
     // Resizing the window with setBounds/setSize will not emit this event.
+    // Though window.onresize event can be invoked in Renderer Process,
+    // listen it only in Main Process to keep in step with onmove event.
     this.window.on('will-resize', this._willResizeListener);
 
     // Moved by hand
+    // window.onmove event cannot be invoked in Renderer Process.
     this.window.on('will-move', this._willMoveListener);
 
     this.window.on('closed', this._closedListener);
 
+    // Though window.onfocus event can be invoked in Renderer Process,
+    // it has a bug. After startup, the first event is not invoked in Render Process.
+    // So, listen it in Main Process.
     this.window.on('focus', this._focusListener);
     this.window.on('blur', this._blurListener);
 
@@ -524,7 +530,11 @@ export class AvatarWindow {
     }
   };
 
-  // @ts-ignore
+  /**
+   * _focusListener in Main Process
+   * After startup, the first window.onfocus event is not invoked in Renderer Process.
+   * Listen focus event in Main Process.
+   */
   private _focusListener = e => {
     if (this.recaptureGlobalFocusEventAfterLocalFocusEvent) {
       this.recaptureGlobalFocusEventAfterLocalFocusEvent = false;
