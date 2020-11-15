@@ -1,12 +1,12 @@
 ' PlantUML
 @startuml
-title DB & Presentation Update Flow ver. 0.9, November 14th, 2020
+title DB & Presentation Update Flow ver. 0.91, November 15th, 2020
 
 skinparam activity {
   BackgroundColor #ffffff
   BorderColor #609090
 }
-
+skinparam activityShape<< Exclude >> octagon
 
 partition "Main Process" {
     "Create MainAction" --> [action] "WorkspaceStoreReducer"
@@ -14,15 +14,17 @@ partition "Main Process" {
     
     "PersistentStoreObserver"   --> [{ state: avatar }] "Create MainAction\n(Mark action as\nDeserializingAction)"
     
-    "_willResizeListener\n_willMoveListener" --> [x,y,width,height] "Create MainAction\n(Mark as RenderedAction)"
+    "_willMoveListener" --> [x,y] "Create MainAction\n(Mark as RenderedAction)"
+    "_willResizeListener" --> [x,y,width,height] Create MainAction\n(Mark as RenderedAction)
     "_focusListener" --> [z] "Create MainAction\n(Mark as RenderedAction)"
     "Create MainAction\n(Mark as RenderedAction)" #e09040 --> [action] "WorkspaceStoreReducer"
 
     "WorkspaceStoreReducer"    --> [new state] "WorkspaceStore" #e0e0e0
         partition MainViewController #e0ffff {
-            "WorkspaceStore"    --> [new state] "Filter excludes state\nmarked as UpstreamAction" #ffc000
+            
+            "WorkspaceStore"    --> [new state] "Excludes update\nmarked as UpstreamAction" << Exclude >> #ffc000
                                 --> "MainViewUpdater"
-                "MainViewUpdater"   --> [new state] "Filter excludes state\nmarked as RenderedAction" #e09040
+                "MainViewUpdater"   --> [new state] "Excludes update\nmarked as RenderedAction" << Exclude >> #e09040
                                     --> [geometry] "MainWindowUpdater"
                     "MainWindowUpdater" --> [x, y, width, height] "browserWindow.setPosition()\nbrowserWindow.setSize()"
                     "MainWindowUpdater" --> [z] "bringToFront()\nsendToBack()"
@@ -33,7 +35,7 @@ partition "Main Process" {
                                 --> [action] "reactiveForwarder"
         }
         partition "Database Update" #fff0e0 {
-            "WorkspaceStore"    --> [new state] "Filter excludes state\nmarked as\nDeserializingAction" #c0ffff
+            "WorkspaceStore"    --> [new state] "Excludes update\nmarked as\nDeserializingAction" << Exclude >> #c0ffff
                                 --> [new state] "debouncedActionQueue"
                                 --> [debounce 1000ms] "persistentStoreActionDispatcher()"
                                 --> [action] "Mark action as SerializingAction" #ffff00                                
@@ -46,25 +48,27 @@ partition "Main Process" {
 
 partition Initialization {
     (*) --> "loadCurrentWorkspace()"
+        --> "Create WorkspaceStore"
+        --> "Start observers"
 }
     
 partition preload {
-    "loadCurrentWorkspace()" --> ['render-card' event with card and avatar] "ipcRenderer - postMessage bridge"     
+    "Create WorkspaceStore" --> ['render-card' event with card and avatar] "ipcRenderer - postMessage bridge"     
     "reactiveForwarder" --> ['reactive-forward' event\n with action] "ipcRenderer - postMessage bridge"
 }
 
-partition RxDB  #ffffe0 {
+partition PersistentStore(RxDB)  #ffffe0 {
     "avatarUpdater(action, reducer(avatar))" --> [new avatar] "start atomicPatch"    
     "start atomicPatch" -left-> [new avatar] "preSave hook"
     if "SerializingAction?" then
-        --> [true] "Mark event as\nSerializingAction" #ffff00 
+        --> [true] "Mark update as\nSerializingAction" #ffff00 
         -right-> "Save"
     else 
         --> [false] "Save"
     "Save" -down-> "Observable Avatar"
-    "Observable Avatar" --> "Filter excludes event\n marked as\nSerializingAction" #e0ffe0
+    "Observable Avatar" --> "Excludes update\n marked as\nSerializingAction"
 
-    "PersistentStoreObserver"   --> [subscribe] "Filter excludes event\n marked as\nSerializingAction" #ffff00
+    "PersistentStoreObserver"   --> [subscribe] "Excludes update\n marked as\nSerializingAction" << Exclude >> #ffff00
                                 --> [update event\n with new avatar] "PersistentStoreObserver"
 }            
 
@@ -78,14 +82,20 @@ partition "GitHub Plugin" #e0ffff {
 
 partition "Renderer Process" {
         "onmousemove\non resizeArea"   --> [x,y,width,height] "Create RendererAction"
-        "Some user interactions\nor inner commands" #ffc0c0 --> [data, geometry,\nstyle, condition, date] "Create RendererAction"
-        "Call Local API\nfrom User Script" #ffc0c0 --> [api] "Create RendererAction"
-        "Call Global API\nfrom User Script" #ffc0c0 --> [api] "Global API"
+        partition "User Script" #ffc0c0 {
+            "Call Global API\nfrom User Script" --> [api] "Global API"
+            "Call Local API\nfrom User Script" --> [api] "Create RendererAction"            
+            note on link
+                New...
+                Delete...
+                Close...
+            end note
+        }
         "Create RendererAction" --> [action] "AvatarStoreReducer"
         "AvatarStoreReducer"    --> [new state] "AvatarStore"
 
         partition "RendererViewController" #ffe0ff {
-            "AvatarStore" #e0e0e0   --> [new state] " Filter excludes state\nmarked as RenderedAction" #e09040
+            "AvatarStore" #e0e0e0   --> [new state] " Excludes update\nmarked as RenderedAction" << Exclude >> #e09040
                                     --> [new state] "RendererViewUpdater"
                 "RendererViewUpdater"   --> [geometry] "RendererWindowUpdater"
                     "RendererWindowUpdater" --> [x, y, width, height] "window.moveTo()\nwindow.resizeTo()"
@@ -93,7 +103,7 @@ partition "Renderer Process" {
                 "RendererViewUpdater" --> [others] "RendererContentsUpdater\n(React)"
         }
         partition "Upstreamer" #fff0e0 {
-            "AvatarStore"   --> [new state] "Filter excludes state\nmarked as DownstreamAction" #ffc0ff
+            "AvatarStore"   --> [new state] "Excludes update\nmarked as DownstreamAction" << Exclude >> #ffc0ff
                             --> [new state] "debouncedActionQueueFromRenderer"
                             --> [debounce 1000ms] "Create UpstreamAction" #ffc000
                             --> [action] "upstreamActionDisptatcher"
@@ -102,24 +112,42 @@ partition "Renderer Process" {
     "ipcRenderer - postMessage bridge" --> [action] "AvatarStoreReducer"
 }
 
-"User Mouse Dragging\n Dragging title bar to move window\n Dragging edges to resize window" #ffc0c0 --> ===B0===
--right-> ['will-resize'\nor\n'will-move'\nevent] "_willResizeListener\n_willMoveListener"
-note top
-    Window position and size
-    are changed immediately
-    by mouse dragging.
-    It is regarded as already rendered.
-end note
-===B0== -right-> ['focus' event] "_focusListener"
-note top
-    Window z-order
-    is changed immediately
-    by mouse clicking.
-    It is regarded as already rendered.    
-end note
-===B0=== --> ['mousemove' event\non resizeArea] "onmousemove\non resizeArea"
-note top
-    Window size has not been changed yet.
-end note
+partition "External Apps" #ffc0c0 {
+    "Call Global API" --> [api] "Global API"
+}
 
-"Call Global API" #ffc0c0 --> [api] "Global API"
+partition "User operations on BrowserWindow" #ffc0c0 {
+    "Mouse dragging on title bar to move window" --> ['will-move'\nevent] "_willMoveListener"
+    note on link
+        Window position
+        is changed immediately
+        by mouse dragging.
+        View is regarded
+        as already rendered.
+    end note
+    "Mouse dragging on edges to resize window" --> ['will-resize' event] "_willResizeListener"
+    note on link
+        Window size
+        is changed immediately
+        by mouse dragging.
+        View is regarded
+        as already rendered.
+    end note
+    "Mouse click to focus window" --> ['focus' event] "_focusListener"
+    note on link
+        Window z-order
+        is changed immediately
+        by mouse clicking.
+        View is regarded
+        as already rendered.    
+    end note
+}
+
+partition "User operations on HTML contents" #ffc0c0 {
+    "Mouse dragging on resizeArea" --> ['mousemove' event\non resizeArea] "onmousemove\non resizeArea"
+    note on link
+        Window size has not been changed yet.
+    end note
+
+    "Other interactions" --> [data, geometry,\nstyle, condition, date] "Create RendererAction"
+}
