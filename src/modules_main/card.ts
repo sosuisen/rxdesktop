@@ -176,6 +176,9 @@ export const deleteCard = async (id: string) => {
       avatars.delete(avatarUrl);
       avatar.window.destroy();
     }
+    else {
+      removeAvatarFromWorkspace(getWorkspaceIdFromUrl(avatarUrl), avatarUrl);
+    }
   }
 
   /**
