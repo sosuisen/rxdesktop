@@ -535,7 +535,7 @@ export class AvatarWindow {
    * After startup, the first window.onfocus event is not invoked in Renderer Process.
    * Listen focus event in Main Process.
    */
-  private _focusListener = e => {
+  private _focusListener = () => {
     if (this.recaptureGlobalFocusEventAfterLocalFocusEvent) {
       this.recaptureGlobalFocusEventAfterLocalFocusEvent = false;
       setGlobalFocusEventListenerPermission(true);
