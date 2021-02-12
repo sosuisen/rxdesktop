@@ -11,10 +11,11 @@ import { scheme } from '../modules_common/const';
 let currentWorkspaceId = '0'; // string expression of positive number
 let changingToWorkspaceId = 'none'; // changingToWorkspaceId stores next id while workspace is changing, 'none' or 'exit'
 
-export type Workspace = {
+type Workspace = {
   name: string;
   avatars: string[];
 };
+
 export const workspaces = new Map<string, Workspace>();
 
 export const getWorkspaceUrl = (workspaceId: string) => {
@@ -54,12 +55,6 @@ export const removeAvatarFromWorkspace = (workspaceId: string, avatarUrl: string
   if (ws) {
     ws.avatars = ws.avatars.filter(_url => _url !== avatarUrl);
   }
-};
-
-export const getNextWorkspaceId = () => {
-  const idArray = [...workspaces.keys()].map(id => parseInt(id, 0)).sort();
-  let lastId = idArray[idArray.length - 1];
-  return `${++lastId}`;
 };
 
 export const setChangingToWorkspaceId = (workspaceId: string) => {

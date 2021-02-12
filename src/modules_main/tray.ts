@@ -9,8 +9,8 @@ import path from 'path';
 import prompt from 'electron-prompt';
 import { app, dialog, Menu, MenuItemConstructorOptions, Tray } from 'electron';
 import { closeSettings, openSettings, settingsDialog } from './settings';
-import { getSettings, MESSAGE } from './store';
-import { avatars, createCard } from './card';
+import { getSettings, MESSAGE } from './store_settings';
+import { createCard } from './card';
 import { emitter } from './event';
 import {
   CardAvatars,
@@ -21,17 +21,10 @@ import {
 } from '../modules_common/cardprop';
 import { getRandomInt } from '../modules_common/utils';
 import { cardColors, ColorName, darkenHexColor } from '../modules_common/color';
-import {
-  getCurrentWorkspace,
-  getCurrentWorkspaceId,
-  getCurrentWorkspaceUrl,
-  getNextWorkspaceId,
-  setChangingToWorkspaceId,
-  Workspace,
-  workspaces,
-} from './store_workspaces';
-import { CardIO } from './io';
+import { addAvatarToWorkspace, setChangingToWorkspaceId } from './store_workspaces';
 import { appIcon } from '../modules_common/const';
+import { getCurrentWorkspace, getWorkspaces } from './store';
+import { avatarWindows } from './avatar_window';
 
 /**
  * Task tray
@@ -49,7 +42,7 @@ let currentLanguage: string;
 let color = { ...cardColors };
 delete color.transparent;
 
-const createNewCard = async () => {
+const createNewCard = () => {
   const geometry = { ...DEFAULT_CARD_GEOMETRY };
   geometry.x += getRandomInt(30, 100);
   geometry.y += getRandomInt(30, 100);
@@ -66,6 +59,9 @@ const createNewCard = async () => {
   const bgColor: string = cardColors[newColor];
 
   const newAvatars: CardAvatars = {};
+  /** 
+   * TODO: 
+  
   newAvatars[getCurrentWorkspaceUrl()] = new TransformableFeature(
     {
       x: geometry.x,
@@ -87,42 +83,63 @@ const createNewCard = async () => {
       avatars: newAvatars,
     } as unknown) as CardPropSerializable)
   );
-  const newAvatar = avatars.get(getCurrentWorkspaceUrl() + id);
+   const newAvatar = avatars.get(getCurrentWorkspaceUrl() + id);
   if (newAvatar) {
     newAvatar.window.focus();
   }
+ */
 };
 
-export const setTrayContextMenu = () => {
+export const setTrayContextMenu = async () => {
   if (!tray) {
     return;
   }
-  const changeWorkspaces: MenuItemConstructorOptions[] = [...workspaces.keys()]
-    .sort()
-    .map(id => {
-      return {
-        label: `${workspaces.get(id)?.name}`,
-        type: 'radio',
-        checked: id === getCurrentWorkspaceId(),
-        click: () => {
-          if (id !== getCurrentWorkspaceId()) {
-            const workspace = workspaces.get(id);
-            if (!workspace) {
-              return;
+  const currentWorkspace = await getCurrentWorkspace().catch(err => {
+    console.error(err);
+    return null;
+  });
+  let changeWorkspaces: MenuItemConstructorOptions[] = [];
+  if (currentWorkspace !== null) {
+    changeWorkspaces = [...(await getWorkspaces())]
+      .sort(function (a, b) {
+        if (a.date.createdDate > b.date.createdDate) {
+          return 1;
+        }
+        else if (a.date.createdDate < b.date.createdDate) {
+          return -1;
+        }
+        return 0;
+      })
+      .map(workspace => {
+        return {
+          label: `${workspace.name}`,
+          type: 'radio',
+          checked: workspace.id === currentWorkspace.id,
+          click: () => {
+            if (workspace.id !== currentWorkspace.id) {
+              closeSettings();
+              if (currentWorkspace.avatars.length === 0) {
+                emitter.emit('change-workspace', workspace.id);
+              }
+              else {
+                setChangingToWorkspaceId(workspace.id);
+                try {
+                  // Remove listeners firstly to avoid focus another card in closing process
+                  /** 
+                 * TODO: 
+                currentWorkspace.avatars.forEach(avatar => avatar.removeWindowListenersExceptClosedEvent());
+                currentWorkspace.avatars.forEach(avatar => avatar.window.webContents.send('card-close'));
+                */
+                } catch (e) {
+                  console.error(e);
+                }
+                // wait 'window-all-closed' event
+              }
             }
-            closeSettings();
-            if (avatars.size === 0) {
-              emitter.emit('change-workspace', id);
-            }
-            else {
-              setChangingToWorkspaceId(id);
-              avatars.forEach(avatar => avatar.window.webContents.send('card-close'));
-              // wait 'window-all-closed' event
-            }
-          }
-        },
-      };
-    });
+          },
+        };
+      });
+  }
   if (changeWorkspaces.length > 0) {
     changeWorkspaces.unshift({
       type: 'separator',
@@ -130,6 +147,7 @@ export const setTrayContextMenu = () => {
   }
 
   const contextMenu = Menu.buildFromTemplate([
+    /*
     {
       label: MESSAGE('newCard'),
       click: () => {
@@ -235,6 +253,7 @@ export const setTrayContextMenu = () => {
         emitter.emit('change-workspace', '0');
       },
     },
+  */
     ...changeWorkspaces,
     {
       type: 'separator',
@@ -247,17 +266,27 @@ export const setTrayContextMenu = () => {
     },
     {
       label: MESSAGE('exit'),
-      click: () => {
+      click: async () => {
+        if (!currentWorkspace) {
+          return;
+        }
         if (settingsDialog && !settingsDialog.isDestroyed()) {
           settingsDialog.close();
         }
         setChangingToWorkspaceId('exit');
         closeSettings();
-        if (avatars.size === 0) {
+        if (currentWorkspace.avatars.length === 0) {
           emitter.emit('exit');
         }
         else {
-          avatars.forEach(avatar => avatar.window.webContents.send('card-close'));
+          try {
+            (await getCurrentWorkspace()).avatars.forEach(url =>
+              avatarWindows.get(url)!.window.webContents.send('card-close')
+            );
+          } catch (e) {
+            console.error(e);
+            emitter.emit('exit');
+          }
         }
       },
     },
@@ -275,9 +304,11 @@ export const initializeTaskTray = () => {
   tray = new Tray(path.join(__dirname, '../assets/' + appIcon));
   currentLanguage = getSettings().persistent.language;
   setTrayContextMenu();
+  /*
   tray.on('click', () => {
     createNewCard();
   });
+  */
 };
 
 emitter.on('updateTrayContextMenu', () => {

@@ -8,8 +8,8 @@
 import path from 'path';
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import electronConnect from 'electron-connect';
-import { subscribeStoreFromSettings } from './store';
-import { CardIO } from './io';
+import { subscribeStoreFromSettings } from './store_settings';
+import { closeDB, exportJSON, importJSON } from './store';
 
 // eslint-disable-next-line import/no-mutable-exports
 export let settingsDialog: BrowserWindow;
@@ -64,17 +64,38 @@ ipcMain.handle('open-directory-selector-dialog', (event, message: string) => {
   return openDirectorySelectorDialog(message);
 });
 
+ipcMain.handle('open-file-selector-dialog', (event, message: string) => {
+  return openFileSelectorDialog(message);
+});
+
 ipcMain.handle('close-cardio', async event => {
-  await CardIO.close();
+  await closeDB();
 });
 
 ipcMain.handle('export-data-to', async (event, filepath: string) => {
-  await CardIO.export(filepath);
+  await exportJSON(filepath);
+});
+
+ipcMain.handle('import-data-from', async (event, filepath: string) => {
+  await importJSON(filepath);
 });
 
 const openDirectorySelectorDialog = (message: string) => {
   const file: string[] | undefined = dialog.showOpenDialogSync(settingsDialog, {
     properties: ['openDirectory'],
+    title: message,
+    message: message, // macOS only
+  });
+  return file;
+};
+
+const openFileSelectorDialog = (message: string) => {
+  const file: string[] | undefined = dialog.showOpenDialogSync(settingsDialog, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'JSON', extensions: ['json'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
     title: message,
     message: message, // macOS only
   });

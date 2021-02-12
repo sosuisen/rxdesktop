@@ -15,7 +15,7 @@ import { MenuItemProps } from './MenuItem';
 import { SettingPageTemplate } from './SettingPageTemplate';
 import { MessageLabel } from '../modules_common/i18n';
 import { ColorName, uiColors } from '../modules_common/color';
-import { cardDirName } from '../modules_common/store.types';
+import { cardDirName } from '../modules_common/store_settings.types';
 import { DialogButton } from '../modules_common/const';
 import { getCurrentDateAndTime } from '../modules_common/utils';
 
@@ -95,6 +95,20 @@ export const SettingPageSave = (props: SettingPageSaveProps) => {
     }
   };
 
+  const onImportDataButtonClick = async () => {
+    const file = await ipcRenderer
+      .invoke('open-file-selector-dialog', MESSAGE('importDataButton'))
+      .catch(e => {
+        console.error(`Failed to open file selector dialog: ${e.me}`);
+      });
+    if (file) {
+      const filepath = file[0];
+      console.debug(filepath);
+      // await ipcRenderer.invoke('export-data-to', filepath);
+      await ipcRenderer.invoke('import-data-from', filepath);
+    }
+  };
+
   const buttonStyle = (color: ColorName) => ({
     backgroundColor: uiColors[color],
   });
@@ -123,6 +137,16 @@ export const SettingPageSave = (props: SettingPageSaveProps) => {
           style={buttonStyle('red')}
         >
           {MESSAGE('exportDataButton')}
+        </button>
+      </div>
+      <div styleName='importData'>
+        <div styleName='importDataLabel'>{MESSAGE('importData')}:</div>
+        <button
+          styleName='importDataButton'
+          onClick={onImportDataButtonClick}
+          style={buttonStyle('red')}
+        >
+          {MESSAGE('importDataButton')}
         </button>
       </div>
     </SettingPageTemplate>

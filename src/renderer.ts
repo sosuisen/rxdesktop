@@ -6,6 +6,7 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
+import { DebounceQueue } from 'rx-queue';
 import {
   AvatarProp,
   AvatarPropSerializable,
@@ -21,13 +22,14 @@ import {
   FileDropEvent,
   ICardEditor,
   InnerClickEvent,
-} from './modules_common/types';
+} from './modules_common/types_cardeditor';
 import { DialogButton } from './modules_common/const';
 import { CardEditor } from './modules_renderer/editor';
 import {
   getRenderOffsetHeight,
   getRenderOffsetWidth,
   initCardRenderer,
+  onResizeByHand,
   render,
   shadowHeight,
   shadowWidth,
@@ -44,10 +46,13 @@ import window from './modules_renderer/window';
 import { getLocationFromUrl } from './modules_common/avatar_url_utils';
 import { getCurrentWorkspaceUrl } from './modules_main/store_workspaces';
 import { setAltDown, setCtrlDown, setMetaDown, setShiftDown } from './modules_common/keys';
+import { Card } from './modules_common/schema_card';
+import { Avatar } from './modules_common/schema_avatar';
+import { avatarSizeUpdateActionCreator } from './modules_common/actions';
 
 let avatarProp: AvatarProp = new AvatarProp('');
 
-let avatarUrl: string;
+let avatarUrlEncoded: string;
 
 let cardCssStyle: CardCssStyle = {
   borderWidth: 0,
@@ -179,7 +184,13 @@ const initializeUIEvents = () => {
   let prevMouseY: number;
   let isHorizontalMoving = false;
   let isVerticalMoving = false;
-  const onMouseMove = async (event: MouseEvent) => {
+  const debouncedResizeQueue = new DebounceQueue(1000);
+  debouncedResizeQueue.subscribe(rect => {
+    const action = avatarSizeUpdateActionCreator(avatarProp.url, rect, true);
+    window.api.persistentStoreActionDispatcherFromRenderer(action);
+  });
+
+  const onmousemove = (event: MouseEvent) => {
     let newWidth = avatarProp.geometry.width + getRenderOffsetWidth();
     let newHeight = avatarProp.geometry.height + getRenderOffsetHeight();
     if (isHorizontalMoving) {
@@ -192,16 +203,19 @@ const initializeUIEvents = () => {
     prevMouseY = event.screenY;
 
     if (isHorizontalMoving || isVerticalMoving) {
-      const rect: {
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-      } = await window.api.setWindowSize(avatarProp.url, newWidth, newHeight);
+      const rect = {
+        x: avatarProp.geometry.x,
+        y: avatarProp.geometry.y,
+        width: newWidth,
+        height: newHeight,
+      };
+      debouncedResizeQueue.next(rect);
+      window.resizeTo(newWidth, newHeight);
       onResizeByHand(rect);
     }
   };
-  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mousemove', onmousemove);
+
   window.addEventListener('mouseup', event => {
     isHorizontalMoving = false;
     isVerticalMoving = false;
@@ -292,8 +306,8 @@ const onload = async () => {
     const pair = arr[i].split('=');
     params[pair[0]] = pair[1];
   }
-  avatarUrl = params.avatarUrl;
-  if (!avatarUrl) {
+  avatarUrlEncoded = params.avatarUrl;
+  if (!avatarUrlEncoded) {
     console.error('id parameter is not given in URL');
     return;
   }
@@ -314,13 +328,13 @@ const onload = async () => {
   );
 
   initializeContentsFrameEvents();
-
-  window.api.finishLoad(avatarUrl);
+  window.api.finishLoad(avatarUrlEncoded);
 };
 
 // eslint-disable-next-line complexity
 window.addEventListener('message', event => {
   if (event.source !== window || !event.data.command) return;
+
   switch (event.data.command) {
     case 'card-blurred':
       onCardBlurred();
@@ -335,13 +349,13 @@ window.addEventListener('message', event => {
       onChangeCardColor(event.data.backgroundColor, event.data.opacity);
       break;
     case 'move-by-hand':
-      onMoveByHand(event.data.bounds);
+      // onMoveByHand(event.data.bounds);
       break;
     case 'render-card':
-      onRenderCard(event.data.prop);
+      onRenderCard(event.data.card, event.data.avatar);
       break;
     case 'resize-by-hand':
-      onResizeByHand(event.data.bounds);
+      // onResizeByHand(event.data.bounds);
       break;
     case 'send-to-back':
       onSendToBack();
@@ -372,42 +386,33 @@ const onCardFocused = async () => {
   avatarProp.status = 'Focused';
   render(['CardStyle', 'ContentsRect']);
 
-  const newZ = await window.api.bringToFront(avatarProp.url);
+  await window.api.bringToFront(avatarProp.url);
+  // const newZ = await window.api.bringToFront(avatarProp.url);
   // eslint-disable-next-line require-atomic-updates
-  avatarProp.geometry.z = newZ;
+  // avatarProp.geometry.z = newZ;
+  /** 
   saveCard(avatarProp);
+  */
 };
 
 const onCardBlurred = () => {
   avatarProp.status = 'Blurred';
   render(['CardStyle', 'ContentsRect']);
 
+  /*
   if (cardEditor.isOpened) {
     if (cardEditor.isCodeMode) {
       return;
     }
     endEditor();
   }
+  */
 };
 
 const onChangeCardColor = (backgroundColor: string, opacity = 1.0) => {
   const uiColor = darkenHexColor(backgroundColor);
   saveCardColor(avatarProp, backgroundColor, uiColor, opacity);
   render(['CardStyle', 'TitleBarStyle', 'EditorStyle']);
-};
-
-const onResizeByHand = (newBounds: {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}) => {
-  avatarProp.geometry.width = Math.round(newBounds.width - getRenderOffsetWidth());
-  avatarProp.geometry.height = Math.round(newBounds.height - getRenderOffsetHeight());
-
-  render(['TitleBar', 'ContentsRect', 'EditorRect']);
-
-  queueSaveCommand();
 };
 
 const onMoveByHand = (newBounds: {
@@ -419,11 +424,15 @@ const onMoveByHand = (newBounds: {
   avatarProp.geometry.x = Math.round(newBounds.x);
   avatarProp.geometry.y = Math.round(newBounds.y);
 
-  queueSaveCommand();
+  // queueSaveCommand();
 };
 
 // Render card data
-const onRenderCard = (_prop: AvatarPropSerializable) => {
+const onRenderCard = (card: Card, avatar: Avatar) => {
+  const _prop: AvatarPropSerializable = {
+    ...avatar,
+    data: card.data,
+  };
   avatarProp = AvatarProp.fromObject(_prop);
 
   initCardRenderer(avatarProp, cardCssStyle, cardEditor);

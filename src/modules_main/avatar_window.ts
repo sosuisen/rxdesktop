@@ -6,11 +6,9 @@
  * found in the LICENSE file in the root directory of this source tree.
  */
 
-import url from 'url';
+import nodeUrl from 'url';
 import path from 'path';
-import contextMenu from 'electron-context-menu';
 
-import { v4 as uuidv4 } from 'uuid';
 import {
   app,
   BrowserWindow,
@@ -19,49 +17,23 @@ import {
   MenuItemConstructorOptions,
   shell,
 } from 'electron';
-import {
-  AvatarProp,
-  AvatarPropSerializable,
-  CardProp,
-  CardPropSerializable,
-  TransformableFeature,
-} from '../modules_common/cardprop';
-import { sleep } from '../modules_common/utils';
-import { CardInitializeType } from '../modules_common/types_cardeditor';
-import {
-  addAvatarToWorkspace,
-  getCurrentWorkspace,
-  getCurrentWorkspaceId,
-  getCurrentWorkspaceUrl,
-  getWorkspaceUrl,
-  removeAvatarFromWorkspace,
-  workspaces,
-} from './store_workspaces';
+import contextMenu from 'electron-context-menu';
+import { DebounceQueue } from 'rx-queue';
 import { DialogButton } from '../modules_common/const';
-import { cardColors, ColorName } from '../modules_common/color';
 import { getSettings, globalDispatch, MESSAGE } from './store_settings';
+import { getIdFromUrl } from '../modules_common/avatar_url_utils';
+import { handlers } from './event';
+import { cardColors, ColorName } from '../modules_common/color';
+import { getCurrentWorkspaceId, workspaces } from './store_workspaces';
+import { Avatar } from '../modules_common/schema_avatar';
+import { Card } from '../modules_common/schema_card';
+import { AvatarUrl } from '../modules_common/schema_workspace';
 import {
-  getIdFromUrl,
-  getLocationFromUrl,
-  getWorkspaceIdFromUrl,
-} from '../modules_common/avatar_url_utils';
-import { emitter, handlers } from './event';
-import { settingsDialog } from './settings';
-import {
-  addAvatarUrl,
-  deleteAvatarUrl,
-  deleteCardData,
-  getCardProp,
-  updateOrCreateCardData,
-} from './store';
-
-/**
- * Card
- * Content unit is called 'card'.
- * A card is internally stored as an actual card (a.k.a Card class),
- * and externally represented as one or multiple avatar cards (a.k.a. Avatar class).
- */
-export const cards: Map<string, Card> = new Map<string, Card>();
+  avatarPositionUpdateActionCreator,
+  avatarSizeUpdateActionCreator,
+  PersistentStoreAction,
+} from '../modules_common/actions';
+import { persistentStoreActionDispatcher } from './store_utils';
 
 /**
  * Const
@@ -69,12 +41,22 @@ export const cards: Map<string, Card> = new Map<string, Card>();
 const MINIMUM_WINDOW_WIDTH = 185; // 180 + shadowWidth
 const MINIMUM_WINDOW_HEIGHT = 80;
 
-const avatars: Map<string, Avatar> = new Map<string, Avatar>();
+export const avatarWindows: Map<AvatarUrl, AvatarWindow> = new Map<
+  AvatarUrl,
+  AvatarWindow
+>();
 
 /**
  * Focus control
  */
 let globalFocusListenerPermission = true;
+let zIndexOfTopAvatar: number;
+export const setZIndexOfTopAvatar = (value: number) => {
+  zIndexOfTopAvatar = value;
+};
+export const getZIndexOfTopAvatar = () => {
+  return zIndexOfTopAvatar;
+};
 /**
  * Set permission to call focus event listener in all renderer processes.
  */
@@ -87,214 +69,32 @@ export const setGlobalFocusEventListenerPermission = (
 export const getGlobalFocusEventListenerPermission = () => {
   return globalFocusListenerPermission;
 };
-export const getAvatarProp = (avatarUrl: string) => {
-  return getCardFromUrl(avatarUrl)?.prop.avatars[getLocationFromUrl(avatarUrl)];
-};
 
-export const getCardFromUrl = (avatarUrl: string) => {
-  const id = getIdFromUrl(avatarUrl);
-  const card = cards.get(id);
-  return card;
-};
+// TODO:
+const saveCard = () => {};
 
-export const getCardData = (avatarUrl: string) => {
-  return getCardFromUrl(avatarUrl)?.prop.data;
-};
-
-/**
- * Card
- */
-
-const generateNewCardId = (): string => {
-  return uuidv4();
-};
-
-export const createCard = async (propObject: CardPropSerializable) => {
-  const prop = CardProp.fromObject(propObject);
-  const card = new Card('New', prop);
-  cards.set(card.prop.id, card);
-
-  /**
-   * Render avatar if current workspace matches
-   */
-  const workspaceUrl = getCurrentWorkspaceUrl();
-  const promises = [];
-  for (const loc in card.prop.avatars) {
-    if (loc.match(workspaceUrl)) {
-      const avatarUrl = loc + card.prop.id;
-      const avatar = new Avatar(
-        new AvatarProp(avatarUrl, getCardData(avatarUrl), getAvatarProp(avatarUrl))
-      );
-      avatars.set(avatarUrl, avatar);
-      promises.push(avatar.render());
-      getCurrentWorkspace()!.avatars.push(avatarUrl);
-      promises.push(addAvatarUrl(getCurrentWorkspaceId(), avatarUrl));
+export const createAvatarWindows = async (
+  cardMap: Map<string, Card>,
+  avatars: Avatar[]
+) => {
+  const renderers: Promise<void>[] = [];
+  avatars.forEach(avatar => {
+    const avatarWindow = new AvatarWindow(avatar.url);
+    avatarWindows.set(avatar.url, avatarWindow);
+    const card = cardMap.get(getIdFromUrl(avatar.url));
+    if (card) {
+      renderers.push(avatarWindow.render(card, avatar));
     }
-  }
-  await Promise.all(promises).catch(e => {
-    console.error(`Error in createCard: ${e.message}`);
   });
-  await saveCard(card.prop);
-  return prop.id;
-};
-
-const saveCard = async (cardProp: CardProp) => {
-  await updateOrCreateCardData(cardProp).catch((e: Error) => {
-    console.error(`Error in saveCard: ${e.message}`);
+  await Promise.all(renderers).catch(e => {
+    console.error(`Error while rendering cards in ready event: ${e.message}`);
   });
-};
-
-export const deleteCardWithRetry = async (id: string) => {
-  for (let i = 0; i < 5; i++) {
-    let doRetry = false;
-    // eslint-disable-next-line no-await-in-loop
-    await deleteCard(id).catch(e => {
-      console.error(`Error in deleteCardWithRetry: ${e.message}`);
-      doRetry = true;
-    });
-    if (!doRetry) {
-      break;
-    }
-    // eslint-disable-next-line no-await-in-loop
-    await sleep(1000);
-    console.debug('retrying delete card ...');
-  }
-};
-
-export const deleteCard = async (id: string) => {
-  const card = cards.get(id);
-  if (!card) {
-    console.error(`Error in deleteCard: card does not exist: ${id}`);
-    return;
-  }
-  /**
-   * Delete all avatar cards
-   */
-  for (const avatarLocation in card.prop.avatars) {
-    const avatarUrl = avatarLocation + id;
-    // eslint-disable-next-line no-await-in-loop
-    await deleteAvatarUrl(getWorkspaceIdFromUrl(avatarUrl), avatarUrl); // Use await because there is race case.
-
-    const avatar = avatars.get(avatarUrl);
-    const ws = getCurrentWorkspace();
-    if (avatar && ws) {
-      ws.avatars = ws.avatars.filter(_url => _url !== avatarUrl);
-      avatars.delete(avatarUrl);
-      avatar.window.destroy();
-    }
-    else {
-      removeAvatarFromWorkspace(getWorkspaceIdFromUrl(avatarUrl), avatarUrl);
-    }
-  }
-
-  /**
-   * Delete actual card
-   */
-  await deleteCardData(id)
-    .catch((e: Error) => {
-      throw new Error(`Error in delete-card: ${e.message}`);
-    })
-    .then(() => {
-      console.debug(`deleted : ${id}`);
-      // eslint-disable-next-line no-unused-expressions
-      cards.delete(id);
-    })
-    .catch((e: Error) => {
-      throw new Error(`Error in destroy window: ${e.message}`);
-    });
-};
-
-export class Card {
-  public prop!: CardProp;
-  public loadOrCreateCardData: () => Promise<void>;
-  /**
-   * constructor
-   * @param cardInitializeType New or Load
-   * @param arg CardProp or id
-   */
-  constructor (public cardInitializeType: CardInitializeType, arg?: CardProp | string) {
-    if (cardInitializeType === 'New') {
-      this.loadOrCreateCardData = () => {
-        return Promise.resolve();
-      };
-      if (arg === undefined) {
-        // Create card with default properties
-        this.prop = new CardProp(generateNewCardId());
-      }
-      else if (arg instanceof CardProp) {
-        // Create card with specified CardProp
-        if (arg.id === '') {
-          arg.id = generateNewCardId();
-        }
-        this.prop = arg;
-      }
-      else {
-        throw new TypeError('Second parameter must be CardProp when creating new card.');
-      }
-    }
-    else {
-      // cardInitializeType === 'Load'
-      // Load Card
-      if (typeof arg !== 'string') {
-        throw new TypeError('Second parameter must be id string when loading the card.');
-      }
-      const id = arg;
-
-      this.loadOrCreateCardData = async () => {
-        this.prop = await getCardProp(id).catch(e => {
-          throw e;
-        });
-      };
-    }
-  }
-}
-
-/**
- * Avatar
- */
-export const deleteAvatar = async (_url: string) => {
-  const avatar = avatars.get(_url);
-  if (avatar) {
-    avatars.delete(_url);
-    if (!avatar.window.isDestroyed()) {
-      avatar.window.destroy();
-    }
-    await deleteAvatarUrl(getCurrentWorkspaceId(), _url);
-    const ws = getCurrentWorkspace();
-    if (ws) {
-      ws.avatars = ws.avatars.filter(avatarUrl => avatarUrl !== _url);
-    }
-  }
-  const card = getCardFromUrl(_url);
-  if (!card) {
-    return;
-  }
-  delete card.prop.avatars[getLocationFromUrl(_url)];
-  await saveCard(card.prop);
-};
-
-export const updateAvatar = async (avatarPropObj: AvatarPropSerializable) => {
-  const prop = AvatarProp.fromObject(avatarPropObj);
-  const card = getCardFromUrl(prop.url);
-  if (!card) {
-    throw new Error('The card is not registered in cards: ' + prop.url);
-  }
-  const feature: TransformableFeature = {
-    geometry: prop.geometry,
-    style: prop.style,
-    condition: prop.condition,
-    date: prop.date,
-  };
-  card.prop.data = prop.data;
-  card.prop.avatars[getLocationFromUrl(prop.url)] = feature;
-
-  await saveCard(card.prop);
 };
 
 /**
  * Context Menu
  */
-const setContextMenu = (prop: AvatarProp, win: BrowserWindow) => {
+const setContextMenu = (win: BrowserWindow) => {
   const setColor = (name: ColorName) => {
     return {
       label: MESSAGE(name),
@@ -310,6 +110,9 @@ const setContextMenu = (prop: AvatarProp, win: BrowserWindow) => {
   };
 
   const moveAvatarToWorkspace = (workspaceId: string) => {
+    /**
+     * TODO:
+
     removeAvatarFromWorkspace(getCurrentWorkspaceId(), prop.url);
     deleteAvatarUrl(getCurrentWorkspaceId(), prop.url);
     const newAvatarUrl = getWorkspaceUrl(workspaceId) + getIdFromUrl(prop.url);
@@ -322,11 +125,15 @@ const setContextMenu = (prop: AvatarProp, win: BrowserWindow) => {
       const avatarProp = card.prop.avatars[getLocationFromUrl(prop.url)];
       delete card.prop.avatars[getLocationFromUrl(prop.url)];
       card.prop.avatars[getLocationFromUrl(newAvatarUrl)] = avatarProp;
-      saveCard(card.prop);
+      // TODO: saveCard(card.prop);
+      saveCard();
     }
+    */
   };
 
   const copyAvatarToWorkspace = (workspaceId: string) => {
+    /**
+     * TODO:
     const newAvatarUrl = getWorkspaceUrl(workspaceId) + getIdFromUrl(prop.url);
     if (workspaces.get(workspaceId)?.avatars.includes(newAvatarUrl)) {
       dialog.showMessageBoxSync(settingsDialog, {
@@ -343,8 +150,10 @@ const setContextMenu = (prop: AvatarProp, win: BrowserWindow) => {
     if (card) {
       const avatarProp = card.prop.avatars[getLocationFromUrl(prop.url)];
       card.prop.avatars[getLocationFromUrl(newAvatarUrl)] = avatarProp;
-      saveCard(card.prop);
+      // TODO: saveCard(card.prop);
+      saveCard();
     }
+    */
   };
 
   const moveToWorkspaces: MenuItemConstructorOptions[] = [...workspaces.keys()]
@@ -440,12 +249,14 @@ const setContextMenu = (prop: AvatarProp, win: BrowserWindow) => {
         },
       },
       {
+        /** TODO:
         label: prop.condition.locked ? MESSAGE('unlockCard') : MESSAGE('lockCard'),
         click: () => {
           prop.condition.locked = !prop.condition.locked;
           win.webContents.send('set-lock', prop.condition.locked);
           resetContextMenu();
         },
+         */
       },
     ],
     append: () => [
@@ -464,14 +275,14 @@ const setContextMenu = (prop: AvatarProp, win: BrowserWindow) => {
   const resetContextMenu = () => {
     // @ts-ignore
     dispose();
-    setContextMenu(prop, win);
+    setContextMenu(win);
   };
 
   return resetContextMenu;
 };
 
-class Avatar {
-  public prop: AvatarProp;
+export class AvatarWindow {
+  public url: string;
   public window: BrowserWindow;
   public indexUrl: string;
 
@@ -483,14 +294,17 @@ class Avatar {
 
   public resetContextMenu: Function;
 
-  constructor (_prop: AvatarProp) {
-    this.prop = _prop;
-    this.indexUrl = url.format({
+  private _debouncedAvatarPositionUpdateActionQueue = new DebounceQueue(1000);
+  private _debouncedAvatarSizeUpdateActionQueue = new DebounceQueue(1000);
+
+  constructor (_url: string) {
+    this.url = _url;
+    this.indexUrl = nodeUrl.format({
       pathname: path.join(__dirname, '../index.html'),
       protocol: 'file:',
       slashes: true,
       query: {
-        avatarUrl: this.prop.url,
+        avatarUrl: this.url,
       },
     });
 
@@ -514,18 +328,35 @@ class Avatar {
     });
     this.window.setMaxListeners(20);
 
-    // this.window.webContents.openDevTools();
+    this.window.webContents.openDevTools();
+
+    // Resized by hand
+    // will-resize is only emitted when the window is being resized manually.
+    // Resizing the window with setBounds/setSize will not emit this event.
+    // Though window.onresize event can be invoked in Renderer Process,
+    // listen it only in Main Process to keep in step with onmove event.
+    this.window.on('will-resize', this._willResizeListener);
+
+    // Moved by hand
+    // window.onmove event cannot be invoked in Renderer Process.
+    this.window.on('will-move', this._willMoveListener);
 
     this.window.on('closed', this._closedListener);
 
-    this.resetContextMenu = setContextMenu(this.prop, this.window);
+    // Though window.onfocus event can be invoked in Renderer Process,
+    // it has a bug. After startup, the first event is not invoked in Render Process.
+    // So, listen it in Main Process.
+    this.window.on('focus', this._focusListener);
+    this.window.on('blur', this._blurListener);
+
+    this.resetContextMenu = setContextMenu(this.window);
 
     // Open hyperlink on external browser window
     // by preventing to open it on new electron window
     // when target='_blank' is set.
-    this.window.webContents.on('new-window', (e, _url) => {
+    this.window.webContents.on('new-window', (e, href) => {
       e.preventDefault();
-      shell.openExternal(_url);
+      shell.openExternal(href);
     });
 
     this.window.webContents.on('did-finish-load', () => {
@@ -557,8 +388,12 @@ class Avatar {
           // Same origin policy between top frame and iframe is failed after reload(). (Cause unknown)
           // Create and destroy card for workaround.
           // this.window.webContents.send('reload');
-          const avatar = new Avatar(this.prop);
+          const avatar = this;
           const prevWin = this.window;
+
+          /**
+           * TODO:
+
           avatars.get(this.prop.url);
           avatar
             .render()
@@ -567,6 +402,7 @@ class Avatar {
               avatars.set(this.prop.url, avatar);
             })
             .catch(() => {});
+           */
         }
         else {
           console.error(`Block navigation to invalid url: ${navUrl}`);
@@ -594,8 +430,11 @@ class Avatar {
               message: MESSAGE('securityLocalNavigationError', navUrl),
             });
             // Destroy
-            const id = getIdFromUrl(this.prop.url);
+            const id = getIdFromUrl(this.url);
+            /**
+             * TODO:
             deleteCardWithRetry(id);
+             */
             return;
           }
 
@@ -625,8 +464,11 @@ class Avatar {
           else if (res === DialogButton.Cancel) {
             // Destroy if not permitted
             console.debug(`Deny ${domain}`);
-            const id = getIdFromUrl(this.prop.url);
+            const id = getIdFromUrl(this.url);
+            /**
+             * TODO:
             deleteCardWithRetry(id);
+            */
           }
         }
       };
@@ -645,44 +487,116 @@ class Avatar {
         event.preventDefault();
       }
     });
+
+    this._debouncedAvatarPositionUpdateActionQueue.subscribe(rect => {
+      const action = avatarPositionUpdateActionCreator(this.url, rect, true);
+      persistentStoreActionDispatcher(action);
+    });
+    this._debouncedAvatarSizeUpdateActionQueue.subscribe(rect => {
+      const action = avatarSizeUpdateActionCreator(this.url, rect, true);
+      persistentStoreActionDispatcher(action);
+    });
   }
+
+  // Forward changes on persistent store to Renderer process
+  public reactiveForwarder = (props: { propertyName?: keyof Avatar; state: any }) => {
+    console.debug(`Forward: ${props.propertyName || 'all properties'} to ${this.url}`);
+    this.window.webContents.send('reactive-forward', props.propertyName, props.state);
+  };
+
+  private _willMoveListener = (event: Electron.Event, rect: Electron.Rectangle) => {
+    // Update x and y
+    this._debouncedAvatarPositionUpdateActionQueue.next(rect);
+    this.reactiveForwarder({ propertyName: 'geometry', state: rect });
+  };
+
+  private _willResizeListener = (event: Electron.Event, rect: Electron.Rectangle) => {
+    // Update x, y, width, height
+    this._debouncedAvatarSizeUpdateActionQueue.next(rect);
+    this.reactiveForwarder({ propertyName: 'geometry', state: rect });
+  };
 
   private _closedListener = () => {
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element.
-    const avatar = avatars.get(this.prop.url);
-    if (avatar) {
-      avatar.removeWindowListeners();
-    }
-    avatars.delete(this.prop.url);
+    this.removeWindowListeners();
+
+    avatarWindows.delete(this.url);
     // Emit window-all-closed event explicitly
     // because Electron sometimes does not emit it automatically.
-    if (avatars.size === 0) {
+    if (avatarWindows.size === 0) {
       app.emit('window-all-closed');
     }
   };
 
+  /**
+   * _focusListener in Main Process
+   * After startup, the first window.onfocus event is not invoked in Renderer Process.
+   * Listen focus event in Main Process.
+   */
+  private _focusListener = () => {
+    if (this.recaptureGlobalFocusEventAfterLocalFocusEvent) {
+      this.recaptureGlobalFocusEventAfterLocalFocusEvent = false;
+      setGlobalFocusEventListenerPermission(true);
+    }
+    if (this.suppressFocusEventOnce) {
+      console.debug(`skip focus event listener ${this.url}`);
+      this.suppressFocusEventOnce = false;
+    }
+    else if (!getGlobalFocusEventListenerPermission()) {
+      console.debug(`focus event listener is suppressed ${this.url}`);
+    }
+    else {
+      console.debug(`focus ${this.url}`);
+      this.window.webContents.send('card-focused');
+    }
+  };
+
+  private _blurListener = () => {
+    if (this.suppressBlurEventOnce) {
+      console.debug(`skip blur event listener ${this.url}`);
+      this.suppressBlurEventOnce = false;
+    }
+    else {
+      console.debug(`blur ${this.url}`);
+      this.window.webContents.send('card-blurred');
+    }
+  };
+
   public removeWindowListeners = () => {
+    this.removeWindowListenersExceptClosedEvent();
     this.window.off('closed', this._closedListener);
   };
 
-  public render = async () => {
-    await this._loadHTML().catch(e => {
+  public removeWindowListenersExceptClosedEvent = () => {
+    this.window.off('will-resize', this._willResizeListener);
+    this.window.off('will-move', this._willMoveListener);
+    this.window.off('focus', this._focusListener);
+    this.window.off('blur', this._blurListener);
+  };
+
+  public render = async (card: Card, avatar: Avatar) => {
+    await this._loadHTML(card, avatar).catch(e => {
       throw new Error(`Error in render(): ${e.message}`);
     });
-    await this._renderCard(this.prop).catch(e => {
+    console.debug('Start _renderCard()' + avatar.url);
+    await this._renderCard(card, avatar).catch(e => {
       throw new Error(`Error in _renderCard(): ${e.message}`);
     });
   };
 
-  _renderCard = (_prop: AvatarProp) => {
+  _renderCard = (card: Card, avatar: Avatar) => {
     return new Promise(resolve => {
-      this.window.setSize(_prop.geometry.width, _prop.geometry.height);
-      this.window.setPosition(_prop.geometry.x, _prop.geometry.y);
-      console.debug(`renderCard in main [${_prop.url}] ${_prop.data.substr(0, 40)}`);
+      console.debug('setSize' + avatar.url);
+      console.dir(avatar, { depth: null });
+      this.window.setSize(avatar.geometry.width, avatar.geometry.height);
+      console.debug('setPosition ' + avatar.url);
+      this.window.setPosition(avatar.geometry.x, avatar.geometry.y);
       this.window.showInactive();
-      this.window.webContents.send('render-card', _prop.toObject()); // CardProp must be serialize because passing non-JavaScript objects to IPC methods is deprecated and will throw an exception beginning with Electron 9.
+
+      console.debug('render-card ' + avatar.url);
+      this.window.webContents.send('render-card', card, avatar); // CardProp must be serialize because passing non-JavaScript objects to IPC methods is deprecated and will throw an exception beginning with Electron 9.
       const checkTimer = setInterval(() => {
         if (this.renderingCompleted) {
           clearInterval(checkTimer);
@@ -692,27 +606,27 @@ class Avatar {
     });
   };
 
-  private _loadHTML: () => Promise<void> = () => {
+  private _loadHTML: (card: Card, avatar: Avatar) => Promise<void> = (
+    card: Card,
+    avatar: Avatar
+  ) => {
     return new Promise((resolve, reject) => {
       const finishLoadListener = (event: Electron.IpcMainInvokeEvent) => {
-        console.debug('loadHTML  ' + this.prop.url);
+        console.debug('loadHTML  ' + this.url);
         const _finishReloadListener = () => {
-          console.debug('Reloaded: ' + this.prop.url);
-          this.window.webContents.send('render-card', this.prop.toObject());
+          console.debug('Reloaded: ' + this.url);
+          this.window.webContents.send('render-card', card, avatar);
         };
 
         // Don't use 'did-finish-load' event.
         // loadHTML resolves after loading HTML and processing required script are finished.
         //     this.window.webContents.on('did-finish-load', () => {
-        const handler = 'finish-load-' + encodeURIComponent(this.prop.url);
+        const handler = 'finish-load-' + encodeURIComponent(this.url);
         handlers.push(handler);
         ipcMain.handle(handler, _finishReloadListener);
         resolve();
       };
-      ipcMain.handleOnce(
-        'finish-load-' + encodeURIComponent(this.prop.url),
-        finishLoadListener
-      );
+      ipcMain.handleOnce('finish-load-' + encodeURIComponent(this.url), finishLoadListener);
 
       this.window.webContents.on(
         'did-fail-load',

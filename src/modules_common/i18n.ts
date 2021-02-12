@@ -55,6 +55,8 @@ type MessagesSettings = {
   settingPageAbout: string;
   exportData: string;
   exportDataButton: string;
+  importData: string;
+  importDataButton: string;
   saveDetailedText: string;
   saveFilePath: string;
   saveChangeFilePathButton: string;
@@ -109,6 +111,8 @@ const SettingsEnglish: MessagesSettings = {
   settingPageAbout: 'About',
   exportData: 'Export data (JSON format) by hand',
   exportDataButton: 'Select folder',
+  importData: 'Import data (JSON format) by hand',
+  importDataButton: 'Select file',
   saveDetailedText: 'Save data automatically to the following location',
   saveFilePath: 'Save in the folder of',
   saveChangeFilePathButton: 'Change',
@@ -191,6 +195,8 @@ const SettingsJapanese: MessagesSettings = {
   settingPageAbout: 'アプリの情報',
   exportData: '手動で書き出し（JSON形式）',
   exportDataButton: '書き出し先を選択',
+  importData: '手動で読み込み（JSON形式）',
+  importDataButton: '読み込み元ファイルを選択',
   saveDetailedText: '自動的に次の場所へ保存',
   saveFilePath: 'このフォルダに保存',
   saveChangeFilePathButton: '変更',

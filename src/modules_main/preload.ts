@@ -7,6 +7,7 @@
  */
 
 import { contextBridge, ipcRenderer, MouseInputEvent } from 'electron';
+import { PersistentStoreAction } from '../modules_common/actions';
 
 contextBridge.exposeInMainWorld('api', {
   /**
@@ -48,6 +49,9 @@ contextBridge.exposeInMainWorld('api', {
   getUuid: () => {
     return ipcRenderer.invoke('get-uuid');
   },
+  persistentStoreActionDispatcherFromRenderer: (action: PersistentStoreAction) => {
+    return ipcRenderer.invoke('persistent-store-dispatch', action);
+  },
   updateAvatar: (avatarPropSerializable: Record<string, any>) => {
     return ipcRenderer.invoke('update-avatar', avatarPropSerializable);
   },
@@ -88,12 +92,12 @@ ipcRenderer.on('card-focused', () =>
 );
 ipcRenderer.on(
   'change-card-color',
-  (event: Electron.IpcRendererEvent, _backgroundColor: string, _opacity: number) =>
+  (event: Electron.IpcRendererEvent, backgroundColor: string, opacity: number) =>
     window.postMessage(
       {
         command: 'change-card-color',
-        backgroundColor: _backgroundColor,
-        opacity: _opacity,
+        backgroundColor,
+        opacity,
       },
       'file://'
     )
@@ -101,22 +105,29 @@ ipcRenderer.on(
 
 ipcRenderer.on(
   'move-by-hand',
-  (event: Electron.IpcRendererEvent, _bounds: Electron.Rectangle) =>
-    window.postMessage({ command: 'move-by-hand', bounds: _bounds }, 'file://')
+  (event: Electron.IpcRendererEvent, bounds: Electron.Rectangle) =>
+    window.postMessage({ command: 'move-by-hand', bounds }, 'file://')
 );
-ipcRenderer.on('render-card', (event: Electron.IpcRendererEvent, _prop: any) =>
-  window.postMessage({ command: 'render-card', prop: _prop }, 'file://')
+ipcRenderer.on('render-card', (event: Electron.IpcRendererEvent, card: any, avatar: any) =>
+  window.postMessage({ command: 'render-card', card, avatar }, 'file://')
 );
 ipcRenderer.on(
   'resize-by-hand',
-  (event: Electron.IpcRendererEvent, _bounds: Electron.Rectangle) =>
-    window.postMessage({ command: 'resize-by-hand', bounds: _bounds }, 'file://')
+  (event: Electron.IpcRendererEvent, bounds: Electron.Rectangle) =>
+    window.postMessage({ command: 'resize-by-hand', bounds }, 'file://')
 );
 ipcRenderer.on('send-to-back', () =>
   window.postMessage({ command: 'send-to-back' }, 'file://')
 );
 ipcRenderer.on('set-lock', (event: Electron.IpcRendererEvent, locked: boolean) => {
-  window.postMessage({ command: 'set-lock', locked: locked }, 'file://');
+  window.postMessage({ command: 'set-lock', locked }, 'file://');
 });
 ipcRenderer.on('zoom-in', () => window.postMessage({ command: 'zoom-in' }, 'file://'));
 ipcRenderer.on('zoom-out', () => window.postMessage({ command: 'zoom-out' }, 'file://'));
+
+/**
+ * Store Actions
+ */
+ipcRenderer.on('reactive-forward', (event, propertyName, doc) => {
+  window.postMessage({ command: 'reactive-forward', propertyName, doc }, 'file://');
+});
