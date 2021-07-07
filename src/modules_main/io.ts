@@ -12,7 +12,9 @@
  */
 import PouchDB from 'pouchdb';
 import { nanoid } from 'nanoid';
-import fs from 'fs-extra';
+import fs, { pathExists } from 'fs-extra';
+import { monotonicFactory } from 'ulid';
+import { GitDocumentDB } from 'git-documentdb';
 import {
   CardAvatars,
   CardCondition,
@@ -509,6 +511,100 @@ class CardIOClass implements ICardIO {
       card: newCardObj,
     };
     fs.writeJSON(filepath, dataObj, { spaces: 2 });
+  };
+
+  public exportToGitDDB = async (filepath: string) => {
+    this.openWorkspaceDB();
+    this.openCardDB();
+
+    const ulid = monotonicFactory();
+    const pathArray = filepath.split('/');
+    const dbName = pathArray.pop();
+    const localDir = pathArray.join('/');
+    console.log('# export to: ' + localDir + ', ' + dbName);
+    const gitDDB = new GitDocumentDB({ localDir, dbName: dbName! });
+    await gitDDB.destroy();
+    await gitDDB.open();
+    const cardCol = gitDDB.collection('card');
+    const noteCol = gitDDB.collection('note');
+
+    const cardIdMap: Record<string, string> = {};
+    const cardObj = (await cardDB.allDocs({ include_docs: true })).rows.reduce(
+      (obj, row) => {
+        const newID = 'c' + ulid();
+        cardIdMap[row.id] = newID;
+        obj[newID] = row.doc;
+        obj[newID]._id = newID;
+        obj[newID]._body = obj.data;
+        obj[newID].type = 'text/html';
+        obj[newID].user = 'local';
+        delete obj[newID].data;
+        delete obj[newID]._rev;
+        return obj;
+      },
+      {} as { [id: string]: any }
+    );
+
+    const workspaceObj: Record<string, any> = {};
+    let counter = 0;
+    const spaces = (workspaceObj['spaces'] = (
+      await workspaceDB.allDocs({ include_docs: true })
+    ).rows.filter(ws => ws.id !== 'currentId'));
+    for (const ws of spaces) {
+      const wsDoc = (ws.doc as unknown) as Record<
+        string,
+        string | string[] | number | Record<string, string>
+      >;
+      const newID = 'n' + ulid();
+      const current = new Date(Date.now() + counter * 1000)
+        .toISOString()
+        .replace(/^(.+?)T(.+?)\..+?$/, '$1 $2');
+      counter++;
+
+      const note = {
+        _id: newID + '/prop',
+        name: wsDoc.name,
+        user: 'local',
+        date: {
+          createdDate: current,
+          modifiedDate: current,
+        },
+      };
+
+      // eslint-disable-next-line no-await-in-loop
+      await noteCol.put(note);
+
+      if (wsDoc) {
+        const avatars = wsDoc.avatars as string[];
+        if (avatars) {
+          for (const url of avatars) {
+            const cardId = cardIdMap[getIdFromUrl(url)];
+            const oldLocation = getLocationFromUrl(url);
+            // @ts-ignore
+            const newAvatar = cardObj[cardId].avatars[oldLocation];
+            newAvatar._id = newID + '/' + cardId;
+            delete newAvatar.url;
+            // eslint-disable-next-line no-await-in-loop
+            await noteCol.put(newAvatar);
+          }
+        }
+      }
+    }
+
+    for (const id in cardObj) {
+      const current = getCurrentDateAndTime();
+      cardObj[id].date = {
+        createdDate: current,
+        modifiedDate: current,
+      };
+      for (const url in cardObj[id].avatars) {
+        cardObj[id].date = cardObj[id].avatars[url].date;
+      }
+      delete cardObj[id].avatars;
+      // eslint-disable-next-line no-await-in-loop
+      await cardCol.put(cardObj[id]);
+    }
+    await gitDDB.close();
   };
 }
 

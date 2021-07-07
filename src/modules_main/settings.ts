@@ -72,6 +72,10 @@ ipcMain.handle('export-data-to', async (event, filepath: string) => {
   await CardIO.export(filepath);
 });
 
+ipcMain.handle('export-data-to-gitddb', async (event, filepath: string) => {
+  await CardIO.exportToGitDDB(filepath);
+});
+
 const openDirectorySelectorDialog = (message: string) => {
   const file: string[] | undefined = dialog.showOpenDialogSync(settingsDialog, {
     properties: ['openDirectory'],

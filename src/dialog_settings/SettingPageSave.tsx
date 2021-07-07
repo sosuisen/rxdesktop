@@ -95,6 +95,23 @@ export const SettingPageSave = (props: SettingPageSaveProps) => {
     }
   };
 
+  const onExportToGitDDBButtonClick = async () => {
+    const file = await ipcRenderer
+      .invoke('open-directory-selector-dialog', MESSAGE('exportDataButton'))
+      .catch(e => {
+        console.error(`Failed to open directory selector dialog: ${e.me}`);
+      });
+    if (file) {
+      const filepath =
+        file[0] +
+        '/rxdesktop_' +
+        getCurrentDateAndTime()
+          .replace(/\s/g, '_')
+          .replace(/:/g, '');
+      await ipcRenderer.invoke('export-data-to-gitddb', filepath);
+    }
+  };
+
   const buttonStyle = (color: ColorName) => ({
     backgroundColor: uiColors[color],
   });

@@ -5,6 +5,8 @@
   "description": "Reactive Desktop",
   "main": "dist/main.js",
   "scripts": {
+    "initial-build": "npm run compile && npm run copy-static && npm run rebuild-native",
+    "rebuild-native": "npx electron-rebuild -f",
     "update-ckeditor": "cd external_modules/ckeditor4/ && git pull origin major && cd ./dev/builder/ && build.sh && cd ../../../../ && git add external_modules/ckeditor4",
     "copy-static": "rm -r dist && cp -r html dist && cp -r external_modules/ckeditor4/dev/builder/release/ckeditor/ dist/ && cp -r external_modules/fontawesome dist/ && cp -r assets dist/ && cp ./node_modules/react/umd/react.production.min.js ./dist/settings/ && cp ./node_modules/react-dom/umd/react-dom.production.min.js ./dist/settings",
     "lint": "eslint --fix --ext .ts .",
@@ -83,8 +85,9 @@
     "babel-plugin-transform-react-jsx": "^6.24.1",
     "cross-env": "^7.0.2",
     "css-loader": "^3.6.0",
-    "electron": "^8.5.1",
-    "electron-connect": "^0.6.3",    
+    "electron": "^11.4.10",
+    "electron-connect": "^0.6.3",
+    "electron-rebuild": "^2.3.5",
     "electron-reload-webpack-plugin": "^2.0.4",
     "eslint": "^6.8.0",
     "eslint-config-standardize": "^0.6.1",
@@ -104,12 +107,14 @@
     "electron-squirrel-startup": "^1.0.0",
     "electron-store": "^6.0.0",
     "fs-extra": "^9.0.1",
+    "git-documentdb": "^0.4.0",
     "nanoid": "^3.1.12",
     "pouchdb": "^7.1.1",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
     "redux": "^4.0.5",
     "typed-intl": "^1.0.3",
+    "ulid": "^2.3.0",
     "uuid": "^8.1.0"
   }
 }
