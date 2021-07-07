@@ -7,7 +7,6 @@
  */
 import path from 'path';
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
-import electronConnect from 'electron-connect';
 import { subscribeStoreFromSettings } from './store';
 import { CardIO } from './io';
 
@@ -42,7 +41,8 @@ export const openSettings = () => {
 
   // hot reload
   if (!app.isPackaged && process.env.NODE_ENV === 'development') {
-    electronConnect.client.create(settingsDialog);
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    require('electron-connect').client.create(settingsDialog);
     settingsDialog.webContents.openDevTools();
   }
 
