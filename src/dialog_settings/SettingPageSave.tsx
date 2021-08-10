@@ -141,6 +141,15 @@ export const SettingPageSave = (props: SettingPageSaveProps) => {
         >
           {MESSAGE('exportDataButton')}
         </button>
+        <br style={{ clear: 'both' }} />
+        <div styleName='exportDataLabel'>{MESSAGE('exportToGitDDB')}:</div>
+        <button
+          styleName='exportDataButton'
+          onClick={onExportToGitDDBButtonClick}
+          style={buttonStyle('red')}
+        >
+          {MESSAGE('exportDataButton')}
+        </button>
       </div>
     </SettingPageTemplate>
   );

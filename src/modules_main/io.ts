@@ -535,7 +535,7 @@ class CardIOClass implements ICardIO {
         cardIdMap[row.id] = newID;
         obj[newID] = row.doc;
         obj[newID]._id = newID;
-        obj[newID]._body = obj.data;
+        obj[newID]._body = obj[newID].data;
         obj[newID].type = 'text/html';
         obj[newID].user = 'local';
         delete obj[newID].data;
@@ -544,7 +544,7 @@ class CardIOClass implements ICardIO {
       },
       {} as { [id: string]: any }
     );
-
+    console.log(cardObj);
     const workspaceObj: Record<string, any> = {};
     let counter = 0;
     const spaces = (workspaceObj['spaces'] = (
@@ -584,6 +584,7 @@ class CardIOClass implements ICardIO {
             const newAvatar = cardObj[cardId].avatars[oldLocation];
             newAvatar._id = newID + '/' + cardId;
             delete newAvatar.url;
+            delete newAvatar.date;
             // eslint-disable-next-line no-await-in-loop
             await noteCol.put(newAvatar);
           }
