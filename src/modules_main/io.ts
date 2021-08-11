@@ -550,6 +550,21 @@ class CardIOClass implements ICardIO {
     const spaces = (workspaceObj['spaces'] = (
       await workspaceDB.allDocs({ include_docs: true })
     ).rows.filter(ws => ws.id !== 'currentId'));
+
+    for (const id in cardObj) {
+      const current = getCurrentDateAndTime();
+      cardObj[id].date = {
+        createdDate: current,
+        modifiedDate: current,
+      };
+      for (const url in cardObj[id].avatars) {
+        cardObj[id].date = cardObj[id].avatars[url].date;
+      }
+      delete cardObj[id].avatars;
+      // eslint-disable-next-line no-await-in-loop
+      await cardCol.put(cardObj[id]);
+    }
+
     for (const ws of spaces) {
       const wsDoc = (ws.doc as unknown) as Record<
         string,
@@ -592,19 +607,6 @@ class CardIOClass implements ICardIO {
       }
     }
 
-    for (const id in cardObj) {
-      const current = getCurrentDateAndTime();
-      cardObj[id].date = {
-        createdDate: current,
-        modifiedDate: current,
-      };
-      for (const url in cardObj[id].avatars) {
-        cardObj[id].date = cardObj[id].avatars[url].date;
-      }
-      delete cardObj[id].avatars;
-      // eslint-disable-next-line no-await-in-loop
-      await cardCol.put(cardObj[id]);
-    }
     await gitDDB.close();
   };
 }
