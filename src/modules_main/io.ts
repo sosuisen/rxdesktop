@@ -560,9 +560,10 @@ class CardIOClass implements ICardIO {
       for (const url in cardObj[id].avatars) {
         cardObj[id].date = cardObj[id].avatars[url].date;
       }
-      delete cardObj[id].avatars;
+      const cardClone = JSON.parse(JSON.stringify(cardObj[id]));
+      delete cardClone.avatars;
       // eslint-disable-next-line no-await-in-loop
-      await cardCol.put(cardObj[id]);
+      await cardCol.put(cardClone);
     }
 
     for (const ws of spaces) {
